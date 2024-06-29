@@ -3,3 +3,4 @@ dynamicconfig/
 bin/
 pkg/
 data/mongo/
+*[^.]*
