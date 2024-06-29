@@ -1,0 +1,188 @@
+version: "3.5"
+
+services:
+
+  # MongoDB service
+  mongo:
+    image: mongo:4.2
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongo:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: logs
+
+  # CockroachDB service
+  cockroach:
+    image: cockroachdb/cockroach:v21.1.0
+    container_name: cockroachdb
+    command: start-single-node --insecure --logtostderr
+    ports:
+      - "26257:26257"
+      - "8082:8080"
+    volumes:
+      - ./cockroach-data:/cockroach/cockroach-data
+
+  # ZooKeeper service
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+
+  # Kafka service
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "logger:1:1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # OpenSearch service configuration
+  opensearch:
+    container_name: temporal-opensearch
+    environment:
+      - discovery.type=single-node  # Configures OpenSearch to run in single-node mode
+      - OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m  # Java options for OpenSearch, setting min and max heap size
+      - cluster.routing.allocation.disk.threshold_enabled=true  # Enables disk usage thresholds
+      - cluster.routing.allocation.disk.watermark.low=512mb  # Low disk watermark
+      - cluster.routing.allocation.disk.watermark.high=256mb  # High disk watermark
+      - cluster.routing.allocation.disk.watermark.flood_stage=128mb  # Flood stage disk watermark
+      - plugins.security.disabled=true  # Disables OpenSearch security plugin
+    image: opensearchproject/opensearch:${OPENSEARCH_VERSION}  # OpenSearch image with version as variable
+    ulimits:
+      nofile:
+        soft: 65536  # Soft limit for the maximum number of open files
+        hard: 65536  # Hard limit for the maximum number of open files
+    networks:
+      - temporal-network
+    expose:
+      - 9200  # Exposes port 9200 for OpenSearch
+    volumes:
+      - /usr/share/opensearch/data  # Volume for OpenSearch data
+
+  # PostgreSQL service configuration
+  postgresql:
+    container_name: temporal-postgresql
+    environment:
+      POSTGRES_PASSWORD: temporal  # Password for the PostgreSQL user
+      POSTGRES_USER: temporal  # PostgreSQL user
+    image: postgres:${POSTGRESQL_VERSION}  # PostgreSQL image with version as variable
+    networks:
+      - temporal-network
+    expose:
+      - 5432  # Exposes port 5432 for PostgreSQL
+    volumes:
+      - /var/lib/postgresql/data  # Volume for PostgreSQL data
+
+  # Temporal service configuration
+  temporal:
+    container_name: temporal
+    depends_on:
+      - postgresql
+      - opensearch
+    environment:
+      - DB=postgres12  # Specifies the database type and version
+      - DB_PORT=5432  # Database port
+      - POSTGRES_USER=temporal  # PostgreSQL user
+      - POSTGRES_PWD=temporal  # PostgreSQL password
+      - POSTGRES_SEEDS=postgresql  # PostgreSQL seeds
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml  # Path to the dynamic config file
+      - ENABLE_ES=true  # Enables Elasticsearch
+      - ES_SEEDS=opensearch  # Elasticsearch seeds
+      - ES_VERSION=v7  # Elasticsearch version
+      
+    image: temporalio/auto-setup:latest  # Temporal image with version as variable
+    networks:
+      - temporal-network
+    ports:
+      - 7233:7233  # Exposes port 7233 for Temporal
+    volumes:
+      - ./config/dynamicconfig:/etc/temporal/config/dynamicconfig
+
+  
+
+  # Temporal Admin Tools configuration
+  temporal-admin-tools:
+    container_name: temporal-admin-tools
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233  # Temporal service address
+      - TEMPORAL_CLI_ADDRESS=temporal:7233  # Temporal CLI address
+    image: temporalio/admin-tools:latest  # Temporal Admin Tools
+    networks:
+      - temporal-network
+    stdin_open: true
+    tty: true
+
+  # Temporal UI configuration
+  temporal-ui:
+    container_name: temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233  # Temporal service address
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000  # CORS origins for Temporal UI
+    image: temporalio/ui:latest  # Temporal UI image
+    networks:
+      - temporal-network
+    ports:
+      - 8080:8080  # Exposes port 8080 for Temporal UI
+
+  # go microservices
+
+  # subscription service
+  subscription-service:
+    build:
+      context: ./../subscription-service
+      dockerfile: ./../subscription-service/subscription-service.dockerfile
+    restart: always
+    environment:
+      - GITHUB_KEY=${GITHUB_KEY}
+      - GITHUB_SECRET=${GITHUB_SECRET}
+    ports:
+      - "80:80"
+    deploy:
+      mode: replicated
+      replicas: 1 # Defines the number of replicas for the service
+
+  # listener service
+  listener-service:
+    build:
+      context: ./../listener-service
+      dockerfile: ./../listener-service/listener-service.dockerfile
+    restart: always
+    ports:
+      - "8083:80"
+    deploy:
+      mode: replicated
+      replicas: 1 # Defines the number of replicas for the service
+
+  # logger service
+  logger-service:
+    build:
+      context: ./../logger-service
+      dockerfile: ./../logger-service/logger-service.dockerfile
+    restart: always
+    depends_on:
+      - mongo
+    ports:
+      - "8084:80"
+    deploy:
+      mode: replicated
+      replicas: 1 # Defines the number of replicas for the service
+
+networks:
+  temporal-network:
+    driver: bridge
+    name: temporal-network  # Defines a network named temporal-network
+
