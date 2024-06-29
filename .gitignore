@@ -2,3 +2,5 @@ cockroach-data/
 dynamicconfig/
 bin/
 pkg/
+data/mongo/
+project/data/
