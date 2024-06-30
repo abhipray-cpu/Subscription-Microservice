@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"subscription-service/auth"
 	"subscription-service/data"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 type Config struct {
 	Models data.Models
 	Writer *kafka.Writer
+	Auth   auth.Authenticator
 }
 
 func main() {
@@ -32,10 +34,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create kafka producer: %v", err)
 	}
-
+	authenticator := auth.NewGitHubAuthenticator()
 	app := Config{
 		Models: data.New(conn),
 		Writer: producer,
+		Auth:   authenticator,
 	}
 	app.routes(e)
 	// testing the producer
@@ -49,7 +52,8 @@ func main() {
 	} else {
 		fmt.Println("Message published successfully")
 	}
-	NewAuth()
+
+	app.Auth.NewAuth()
 	initialWaitTime := 1 * time.Second
 	maxRetries := 5
 	factor := 2
@@ -59,6 +63,7 @@ func main() {
 		if err != nil {
 			log.Printf("Attempt %d: server failed to start: %v", attempt, err)
 			if attempt == maxRetries {
+				app.publishMessage("key", Message{"Subscription Service", "Server failed to start"})
 				log.Fatalf("Server failed to start after %d attempts", maxRetries)
 			}
 			time.Sleep(initialWaitTime)

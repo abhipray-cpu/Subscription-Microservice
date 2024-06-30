@@ -3,6 +3,7 @@ module subscription-service
 go 1.22.3
 
 require (
+	github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff
 	github.com/gorilla/sessions v1.1.1
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/labstack/echo/v4 v4.12.0
@@ -12,6 +13,7 @@ require (
 
 require (
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/gomodule/redigo v2.0.0+incompatible // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.6.2 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
