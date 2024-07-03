@@ -1,12 +1,238 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
 	"net/http"
+	"subscription-service/data"
+	"subscription-service/util"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/labstack/echo/v4"
 )
 
 // pingHandler handles the ping request and returns a success message.
 func (app *Config) pingHandler(c echo.Context) error {
 	return c.String(http.StatusOK, "The system is working fine")
+}
+
+// signup handles the user registration process.
+func (app *Config) signup(c echo.Context) error {
+	// Initialize a User struct to store the user's registration details.
+	var user data.User
+
+	// Bind the incoming JSON payload to the user struct.
+	// This step parses the request body and maps the JSON fields to the struct fields.
+	if err := c.Bind(&user); err != nil {
+		// If binding fails, publish an error message and return a bad request response.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to bind user data: "+err.Error())
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	// Generate an access token for the user.
+	token, err := util.GenerateAccessToken(32)
+	if err != nil {
+		// If token generation fails, publish an error message and return an internal server error response.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to generate access token: "+err.Error())
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	// Assign the generated token to the user's AccessToken field.
+	user.AccessToken = token
+
+	// Hash the user's password for secure storage.
+	hash, err := util.HashPassword(user.Password)
+	if err != nil {
+		// If password hashing fails, publish an error message and return an internal server error response.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to hash password: "+err.Error())
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	// Replace the plain text password with the hashed password.
+	user.Password = hash
+
+	// Validate the user's details.
+	valid, reason := user.ValidateUser()
+	if valid == false {
+		// If validation fails, return a bad request response with the reason for failure.
+		errorMessage := fmt.Sprintf("Failed to create user:%s", reason)
+		return c.JSON(http.StatusBadRequest, errorMessage)
+	}
+
+	// Insert the user into the database.
+	if err := user.InsertUser(user); err != nil {
+		// If insertion fails, publish an error message and return an internal server error response.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to insert user: "+err.Error())
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	// Return a created response indicating successful account creation.
+	return c.JSON(http.StatusCreated, "account created successfully")
+}
+
+// login handles user login requests.
+func (app *Config) login(c echo.Context) error {
+	// Define a struct to hold login details received from the request body.
+	var loginDetails struct {
+		Email    string
+		Password string
+	}
+
+	// Bind the incoming JSON payload to the loginDetails struct.
+	// This step parses the request body and maps the JSON fields to the struct fields.
+	if err := c.Bind(&loginDetails); err != nil {
+		// If binding fails, publish an error message and return a bad request response.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to bind login details: "+err.Error())
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	// Extract email and password from the parsed login details.
+	email, password := loginDetails.Email, loginDetails.Password
+
+	// Initialize a User struct to hold the fetched user details.
+	user := data.User{}
+
+	// Attempt to fetch the user by email from the database.
+	if err := user.GetByEmail(email); err != nil {
+		// Check if the error is because the user does not exist in the database.
+		if err == pgx.ErrNoRows {
+			// If the user does not exist, respond with HTTP 404 Not Found.
+			return c.JSON(http.StatusNotFound, "user does not exist")
+		}
+		// If there is another error, publish an error message and return an internal server error response.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to get user by email"+err.Error())
+		return c.JSON(http.StatusInternalServerError, "Failed to fetch user")
+	}
+
+	// Compare the provided password with the user's stored password.
+	if err := util.ComparePasswords(user.Password, password); err != nil {
+		// If the password comparison fails, publish an error message and return an unauthorized response.
+		app.Producer.publishMessage("error", "Subscription-Service", "Invalid password: "+err.Error())
+		return c.JSON(http.StatusUnauthorized, "Wrong password")
+	}
+
+	// Generate a JWT token for the authenticated user.
+	token, err := util.GenerateJWT(int64(user.ID), user.GithubName)
+	if err != nil {
+		// If token generation fails, publish an error message and return an internal server error response.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to generate JWT: "+err.Error())
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	// Return a successful login response with the generated token and user details.
+	return c.JSON(http.StatusOK, map[string]string{
+		"token":           token,                      // The generated JWT token
+		"user_name":       user.UserName,              // The user's username
+		"github_username": user.GithubName,            // The user's GitHub username
+		"message":         "Login successful",         // Success message
+		"id":              fmt.Sprintf("%d", user.ID), // The user's ID, converted to a string
+	})
+}
+
+// deleteAccount handles the deletion of a user's account.
+func (app *Config) deleteAccount(c echo.Context) error {
+	// Extract the userID from the context. This value is expected to be set by a previous middleware.
+	userId := c.Get("userID").(int64)
+
+	// Initialize a User struct. This struct will be used to call the DeleteUser method.
+	var user data.User
+
+	// Attempt to delete the user from the database using the DeleteUser method.
+	if err := user.DeleteUser(userId); err != nil {
+		// Check if the error is because the user does not exist in the database.
+		if err == pgx.ErrNoRows {
+			// If the user does not exist, respond with HTTP 404 Not Found.
+			return c.JSON(http.StatusNotFound, "user does not exist")
+		}
+		// If there is another error, publish an error message indicating failure to delete the user account.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to delete user account"+err.Error())
+		// Respond with HTTP 500 Internal Server Error indicating failure to delete the account.
+		return c.JSON(http.StatusInternalServerError, "Failed to delete account")
+	}
+
+	// If the deletion is successful, respond with HTTP 200 OK and a success message.
+	return c.JSON(http.StatusOK, "account deleted successfully")
+}
+
+// getAccount handles the retrieval of a user's account details.
+func (app *Config) getAccount(c echo.Context) error {
+	// Extract the userID from the context, which is assumed to be set by a previous middleware.
+	userId := c.Get("userID").(int64)
+
+	// Initialize a User struct to hold the user details.
+	var user data.User
+
+	// Attempt to fetch the user details from the database using the userID.
+	if err := user.GetUser(int64(userId)); err != nil {
+		// Check if the error is because the user does not exist in the database.
+		if err == pgx.ErrNoRows {
+			// Respond with HTTP 404 Not Found if the user does not exist.
+			return c.JSON(http.StatusNotFound, "user does not exist")
+		}
+		// Publish an error message indicating failure to fetch user details.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to fetch user account"+err.Error())
+		// Respond with HTTP 500 Internal Server Error indicating failure to fetch the user.
+		return c.JSON(http.StatusInternalServerError, "Failed to fetch user")
+	}
+
+	// Respond with HTTP 200 OK and the user details in JSON format if the user is successfully retrieved.
+	return c.JSON(http.StatusOK, map[string]string{
+		"user_name": user.UserName,                         // User's username
+		"github_id": user.GithubId,                         // User's GitHub ID
+		"email":     user.Email,                            // User's email address
+		"bio":       user.Bio,                              // User's biography
+		"avatar":    user.AvatarUrl,                        // URL to the user's avatar image
+		"message":   "User details retrieved successfully", // Success message
+	})
+}
+
+// updateAccount handles account updates.
+func (app *Config) updateAccount(c echo.Context) error {
+	// Define a struct to hold the new account details received from the request body.
+	var newDetails struct {
+		FirstName string
+		LastName  string
+		Email     string
+	}
+
+	// Extract the userID from the context, which is assumed to be set by a previous middleware.
+	userId := c.Get("userID").(int64)
+
+	// Initialize a User struct to hold the updated user details.
+	var user data.User
+
+	// Bind the incoming JSON payload to the newDetails struct.
+	// This step parses the request body and maps the JSON fields to the struct fields.
+	if err := c.Bind(&newDetails); err != nil {
+		// Check if the error is because the user does not exist in the database.
+		// This check seems misplaced as c.Bind() error does not relate to database operations.
+		if err == pgx.ErrNoRows {
+			// Respond with HTTP 404 Not Found if the user does not exist.
+			return c.JSON(http.StatusNotFound, "user does not exist")
+		}
+		// Publish an error message indicating failure to update user details due to binding error.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to update user"+err.Error())
+		// Respond with HTTP 500 Internal Server Error indicating failure to bind request data.
+		return c.JSON(http.StatusInternalServerError, "Failed to update user details")
+	}
+
+	// Update the user struct with the new details received from the request.
+	user.FirstName = newDetails.FirstName
+	user.LastName = newDetails.LastName
+	user.Email = newDetails.Email
+
+	// Attempt to update the user in the database with the new details.
+	if err := user.UpdateUser(userId, user); err != nil {
+		// Check if the error is because the user does not exist in the database.
+		if errors.Is(err, sql.ErrNoRows) {
+			// Respond with HTTP 404 Not Found if the user is not found in the database.
+			return c.JSON(http.StatusNotFound, "user not found")
+		}
+		// Publish an error message indicating failure to update the user in the database.
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to update user: "+err.Error())
+		// Respond with HTTP 500 Internal Server Error indicating failure to update the user.
+		return c.JSON(http.StatusInternalServerError, "failed to update user account")
+	}
+
+	// Respond with HTTP 200 OK on successful update of the user account.
+	return c.JSON(http.StatusOK, "account updated successfully")
 }

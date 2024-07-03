@@ -4,11 +4,12 @@ go 1.22.3
 
 require (
 	github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff
-	github.com/gorilla/sessions v1.1.1
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/markbates/goth v1.80.0
 	github.com/segmentio/kafka-go v0.4.47
+	golang.org/x/crypto v0.24.0
 )
 
 require (
@@ -17,6 +18,7 @@ require (
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.6.2 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
+	github.com/gorilla/sessions v1.1.1 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
@@ -31,11 +33,10 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 )
