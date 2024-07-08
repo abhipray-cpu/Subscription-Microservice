@@ -13,6 +13,7 @@ import (
 )
 
 // Config holds the application-wide configurations.
+// yo
 type Config struct {
 	Models   data.Models        // Data models for the application.
 	Auth     auth.Authenticator // Authentication mechanism.
