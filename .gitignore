@@ -6,4 +6,4 @@ data/mongo/
 subscriptionApp
 listenerApp
 loggerApp
-.env
+*.env
