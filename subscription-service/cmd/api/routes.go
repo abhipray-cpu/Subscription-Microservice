@@ -14,8 +14,8 @@ func (app *Config) routes(e *echo.Echo) {
 	e.GET("/auth/:provider", app.Auth.Auth)              // OAuth authentication endpoint.
 	e.POST("/signup", app.signup)                        // Signup endpoint.
 	e.POST("/login", app.login)                          // Login endpoint.                           // Logout endpoint.
-	g.DELETE("/delete", app.deleteAccount)               // Delete account endpoint.
-	g.GET("/get", app.getAccount)                        // Get account endpoint.
-	g.PUT("/edit", app.updateAccount)                    // Update account endpoint.
+	g.DELETE("/", app.deleteAccount)                     // Delete account endpoint.
+	g.GET("/", app.getAccount)                           // Get account endpoint.
+	g.PUT("/", app.updateAccount)                        // Update account endpoint.
 
 }

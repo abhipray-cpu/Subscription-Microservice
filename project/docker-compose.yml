@@ -6,6 +6,8 @@ services:
   mongo:
     image: mongo:4.2
     container_name: mongodb
+    networks:
+      - temporal-network
     ports:
       - "27017:27017"
     volumes:
@@ -20,6 +22,8 @@ services:
     image: cockroachdb/cockroach:v21.1.0
     container_name: cockroachdb
     command: start-single-node --insecure --logtostderr
+    networks:
+      - temporal-network
     ports:
       - "26257:26257"
       - "8082:8080"
@@ -30,6 +34,8 @@ services:
   redis:
     image: redis:latest
     container_name: redis
+    networks:
+      - temporal-network
     ports:
       - "6379:6379"
     volumes:
@@ -40,6 +46,8 @@ services:
   zookeeper:
     image: wurstmeister/zookeeper
     container_name: zookeeper
+    networks:
+      - temporal-network
     ports:
       - "2181:2181"
 
@@ -47,6 +55,8 @@ services:
   kafka:
     image: wurstmeister/kafka
     container_name: kafka
+    networks:
+      - temporal-network
     ports:
       - "9092:9092"
     environment:
@@ -156,9 +166,20 @@ services:
       context: ./../subscription-service
       dockerfile: ./../subscription-service/subscription-service.dockerfile
     restart: always
+    depends_on:
+      - temporal
+      - kafka
+    networks:
+      - temporal-network
     environment:
       - GITHUB_KEY=${GITHUB_KEY}
       - GITHUB_SECRET=${GITHUB_SECRET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
     ports:
       - "80:80"
     deploy:
@@ -171,6 +192,8 @@ services:
       context: ./../listener-service
       dockerfile: ./../listener-service/listener-service.dockerfile
     restart: always
+    networks:
+      - temporal-network
     ports:
       - "8083:80"
     deploy:
@@ -185,6 +208,8 @@ services:
     restart: always
     depends_on:
       - mongo
+    networks:
+      - temporal-network
     ports:
       - "8084:80"
     deploy:

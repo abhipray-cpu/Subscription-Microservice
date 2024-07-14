@@ -23,8 +23,10 @@ type User struct {
 	AccessToken string    `json:"accessToken"` // Access token for authentication.
 	Bio         string    `json:"bio"`         // Biography of the user.
 	Email       string    `json:"email"`       // Email address of the user.
+	Contact     string    `json:"contact"`     // Contact number of the user.
 	ExpiresAt   time.Time `json:"expiresAt"`   // Expiration time of the user's session or token.
 	Password    string    `json:"password"`    // Password of the user.
+	Verified    bool      `json:"verified"`    // Verification status of the user.
 }
 
 // connection holds a global database connection, shared across instances of Models.
@@ -60,7 +62,9 @@ func ensureTableExists(conn *pgx.Conn) {
         bio TEXT,
         email VARCHAR(255) NOT NULL UNIQUE,
         expires_at TIMESTAMP NOT NULL,
-		password VARCHAR(255) NOT NULL
+		password VARCHAR(255) NOT NULL,
+		contact VARCHAR(255) UNIQUE,
+		verified BOOLEAN DEFAULT FALSE
     );`
 
 	if _, err := conn.Exec(context.Background(), query); err != nil {
@@ -84,7 +88,12 @@ func (u *User) ValidateUser() (bool, string) {
 	if !isValidEmail(u.Email) {
 		return false, "email format is invalid"
 	}
+	if u.Contact != "" {
+		if !isValidIndianPhoneNumber(u.Contact) {
+			return false, "contact number is invalid"
+		}
 
+	}
 	// All validations passed
 	return true, ""
 }
@@ -97,6 +106,15 @@ func isValidEmail(email string) bool {
 	return regex.MatchString(email)
 }
 
+// isValidIndianPhoneNumber checks if the phone number provided matches the Indian phone number format.
+// Returns true if the phone number is valid, false otherwise.
+func isValidIndianPhoneNumber(phoneNumber string) bool {
+	// Regex for validating an Indian phone number
+	// Starts with 7, 8, or 9 and followed by 9 more digits
+	regex := regexp.MustCompile(`^[789]\d{9}$`)
+	return regex.MatchString(phoneNumber)
+}
+
 // InsertUser inserts a new user into the database.
 // This method is useful for registering new users in the system.
 // Parameters:
@@ -105,9 +123,9 @@ func isValidEmail(email string) bool {
 // - An error if the query execution fails.
 func (u *User) InsertUser(user User) error {
 	// SQL query to insert a new user, returning the generated ID.
-	query := `INSERT INTO users (user_name, github_name, github_id, first_name, last_name, avatar_url, bio, email, expires_at,password) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`
+	query := `INSERT INTO users (user_name, github_name, github_id, first_name, last_name, avatar_url, bio, email,contact, expires_at,password,verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,$12) RETURNING id`
 	// Execute the query and scan the returned ID into the User struct.
-	err := connection.QueryRow(context.Background(), query, user.UserName, user.GithubName, user.GithubId, user.FirstName, user.LastName, user.AvatarUrl, user.Bio, user.Email, user.ExpiresAt, user.Password).Scan(&u.ID)
+	err := connection.QueryRow(context.Background(), query, user.UserName, user.GithubName, user.GithubId, user.FirstName, user.LastName, user.AvatarUrl, user.Bio, user.Email, user.Contact, user.ExpiresAt, user.Password, user.Verified).Scan(&u.ID)
 	if err != nil {
 		return err // Return any errors encountered.
 	}
@@ -123,9 +141,9 @@ func (u *User) InsertUser(user User) error {
 // - An error if the query execution or scan fails.
 func (u *User) GetUser(id int64) error {
 	// SQL query to select a user by ID.
-	query := `SELECT id, user_name, github_name, github_id, first_name, last_name, avatar_url, bio, email, expires_at FROM users WHERE id=$1`
+	query := `SELECT id, user_name, github_name, github_id, first_name, last_name, avatar_url, bio, email,contact,verified FROM users WHERE id=$1`
 	// Execute the query and scan the result into the User struct.
-	err := connection.QueryRow(context.Background(), query, id).Scan(&u.ID, &u.UserName, &u.GithubName, &u.GithubId, &u.FirstName, &u.LastName, &u.AvatarUrl, &u.Bio, &u.Email, &u.ExpiresAt)
+	err := connection.QueryRow(context.Background(), query, id).Scan(&u.ID, &u.UserName, &u.GithubName, &u.GithubId, &u.FirstName, &u.LastName, &u.AvatarUrl, &u.Bio, &u.Email, &u.Contact, &u.Verified)
 	if err != nil {
 		return err // Return any errors encountered.
 	}
@@ -141,9 +159,9 @@ func (u *User) GetUser(id int64) error {
 // - An error if the query execution fails.
 func (u *User) UpdateUser(id int64, updatedUser User) error {
 	// SQL query to update a user's information by ID.
-	query := `UPDATE users SET user_name=$1, github_name=$2, github_id=$3, first_name=$4, last_name=$5, avatar_url=$6, access_token=$7, bio=$8, email=$9, expires_at=$10 WHERE id=$11`
+	query := `UPDATE users SET user_name=$1, first_name=$2, last_name=$3,bio=$4, email=$5,contact=$6, verified=$7 WHERE id=$8`
 	// Execute the query without returning any result.
-	_, err := connection.Exec(context.Background(), query, updatedUser.UserName, updatedUser.GithubName, updatedUser.GithubId, updatedUser.FirstName, updatedUser.LastName, updatedUser.AvatarUrl, updatedUser.AccessToken, updatedUser.Bio, updatedUser.Email, updatedUser.ExpiresAt, id)
+	_, err := connection.Exec(context.Background(), query, updatedUser.UserName, updatedUser.FirstName, updatedUser.LastName, updatedUser.Bio, updatedUser.Email, updatedUser.Contact, updatedUser.Verified, id)
 	if err != nil {
 		return err // Return any errors encountered.
 	}
@@ -179,9 +197,9 @@ func (u *User) DeleteUser(id int64) error {
 // - An error if the query execution or scan fails.
 func (u *User) GetByGitId(githubId string) error {
 	// SQL query to select a user by GitHub ID.
-	query := `SELECT id, user_name, github_name, github_id, first_name, last_name, avatar_url, access_token, bio, email, expires_at FROM users WHERE github_id=$1`
+	query := `SELECT id, user_name, github_name, github_id, first_name, last_name, avatar_url, bio, email,contact,verified FROM users WHERE github_id=$1`
 	// Execute the query and scan the result into the User struct.
-	err := connection.QueryRow(context.Background(), query, githubId).Scan(&u.ID, &u.UserName, &u.GithubName, &u.GithubId, &u.FirstName, &u.LastName, &u.AvatarUrl, &u.AccessToken, &u.Bio, &u.Email, &u.ExpiresAt)
+	err := connection.QueryRow(context.Background(), query, githubId).Scan(&u.ID, &u.UserName, &u.GithubName, &u.GithubId, &u.FirstName, &u.LastName, &u.AvatarUrl, &u.Bio, &u.Email, &u.Contact, &u.Verified)
 	if err != nil {
 		return err // Return any errors encountered.
 	}
@@ -198,9 +216,28 @@ func (u *User) GetByGitId(githubId string) error {
 // - An error if the query execution or scan fails.
 func (u *User) GetByEmail(email string) error {
 	// SQL query to select a user by GitHub ID.
-	query := `SELECT id, user_name,password,email FROM users WHERE email=$1`
+	query := `SELECT id, user_name,password,email,contact FROM users WHERE email=$1`
 	// Execute the query and scan the result into the User struct.
-	err := connection.QueryRow(context.Background(), query, email).Scan(&u.ID, &u.UserName, &u.Password, &u.Email)
+	err := connection.QueryRow(context.Background(), query, email).Scan(&u.ID, &u.UserName, &u.Password, &u.Email, &u.Contact)
+	if err != nil {
+		return err // Return any errors encountered.
+	}
+	return nil // Return nil on success.
+}
+
+// GetByContact retrieves a user by their contact number from the database.
+// This method is useful for authenticating users based on their email address,
+// allowing the application to fetch user details based on their email.
+// Parameters:
+// - email: The email address of the user to retrieve.
+// Returns:
+// - nil if the user is successfully found and the User struct is populated.
+// - An error if the query execution or scan fails.
+func (u *User) GetByContact(contact string) error {
+	// SQL query to select a user by GitHub ID.
+	query := `SELECT id, user_name,password,email,contact FROM users WHERE contact=$1`
+	// Execute the query and scan the result into the User struct.
+	err := connection.QueryRow(context.Background(), query, contact).Scan(&u.ID, &u.UserName, &u.Password, &u.Email, &u.Contact)
 	if err != nil {
 		return err // Return any errors encountered.
 	}

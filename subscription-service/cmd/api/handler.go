@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"subscription-service/data"
 	"subscription-service/util"
 
@@ -39,7 +40,7 @@ func (app *Config) signup(c echo.Context) error {
 	}
 	// Assign the generated token to the user's AccessToken field.
 	user.AccessToken = token
-
+	user.Verified = false
 	// Hash the user's password for secure storage.
 	hash, err := util.HashPassword(user.Password)
 	if err != nil {
@@ -52,7 +53,7 @@ func (app *Config) signup(c echo.Context) error {
 
 	// Validate the user's details.
 	valid, reason := user.ValidateUser()
-	if valid == false {
+	if !valid {
 		// If validation fails, return a bad request response with the reason for failure.
 		errorMessage := fmt.Sprintf("Failed to create user:%s", reason)
 		return c.JSON(http.StatusBadRequest, errorMessage)
@@ -73,8 +74,8 @@ func (app *Config) signup(c echo.Context) error {
 func (app *Config) login(c echo.Context) error {
 	// Define a struct to hold login details received from the request body.
 	var loginDetails struct {
-		Email    string
-		Password string
+		Credentials string
+		Password    string
 	}
 
 	// Bind the incoming JSON payload to the loginDetails struct.
@@ -84,27 +85,57 @@ func (app *Config) login(c echo.Context) error {
 		app.Producer.publishMessage("error", "Subscription-Service", "Failed to bind login details: "+err.Error())
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
-
 	// Extract email and password from the parsed login details.
-	email, password := loginDetails.Email, loginDetails.Password
+	credential, password := loginDetails.Credentials, loginDetails.Password
 
+	// switch between mobile and email number
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	phoneRegex := regexp.MustCompile(`^[789]\d{9}$`)
+	var credential_type string
+	switch {
+	case emailRegex.MatchString(credential):
+		credential_type = "email"
+	case phoneRegex.MatchString(credential):
+		credential_type = "phone"
+	default:
+		credential_type = "email"
+	}
+
+	var hashedPassword string
 	// Initialize a User struct to hold the fetched user details.
 	user := data.User{}
 
-	// Attempt to fetch the user by email from the database.
-	if err := user.GetByEmail(email); err != nil {
-		// Check if the error is because the user does not exist in the database.
-		if err == pgx.ErrNoRows {
-			// If the user does not exist, respond with HTTP 404 Not Found.
-			return c.JSON(http.StatusNotFound, "user does not exist")
+	// switch retreival function based on the credential type
+	if credential_type == "email" {
+		// Attempt to fetch the user by email from the database.
+		if err := user.GetByEmail(credential); err != nil {
+			// Check if the error is because the user does not exist in the database.
+			if err == pgx.ErrNoRows {
+				// If the user does not exist, respond with HTTP 404 Not Found.
+				return c.JSON(http.StatusNotFound, "user does not exist")
+			}
+			// If there is another error, publish an error message and return an internal server error response.
+			app.Producer.publishMessage("error", "Subscription-Service", "Failed to get user by email"+err.Error())
+			return c.JSON(http.StatusInternalServerError, "Failed to fetch user")
 		}
-		// If there is another error, publish an error message and return an internal server error response.
-		app.Producer.publishMessage("error", "Subscription-Service", "Failed to get user by email"+err.Error())
-		return c.JSON(http.StatusInternalServerError, "Failed to fetch user")
+		hashedPassword = user.Password
+	} else {
+		// Attempt to fetch the user by contact from the database.
+		if err := user.GetByContact(credential); err != nil {
+			// Check if the error is because the user does not exist in the database.
+			if err == pgx.ErrNoRows {
+				// If the user does not exist, respond with HTTP 404 Not Found.
+				return c.JSON(http.StatusNotFound, "user does not exist")
+			}
+			// If there is another error, publish an error message and return an internal server error response.
+			app.Producer.publishMessage("error", "Subscription-Service", "Failed to get user by email"+err.Error())
+			return c.JSON(http.StatusInternalServerError, "Failed to fetch user")
+		}
+		hashedPassword = user.Password
 	}
 
 	// Compare the provided password with the user's stored password.
-	if err := util.ComparePasswords(user.Password, password); err != nil {
+	if err := util.ComparePasswords(hashedPassword, password); err != nil {
 		// If the password comparison fails, publish an error message and return an unauthorized response.
 		app.Producer.publishMessage("error", "Subscription-Service", "Invalid password: "+err.Error())
 		return c.JSON(http.StatusUnauthorized, "Wrong password")
@@ -179,6 +210,7 @@ func (app *Config) getAccount(c echo.Context) error {
 		"user_name": user.UserName,                         // User's username
 		"github_id": user.GithubId,                         // User's GitHub ID
 		"email":     user.Email,                            // User's email address
+		"contact":   user.Contact,                          // User's contact information
 		"bio":       user.Bio,                              // User's biography
 		"avatar":    user.AvatarUrl,                        // URL to the user's avatar image
 		"message":   "User details retrieved successfully", // Success message
@@ -192,6 +224,7 @@ func (app *Config) updateAccount(c echo.Context) error {
 		FirstName string
 		LastName  string
 		Email     string
+		Contact   string
 	}
 
 	// Extract the userID from the context, which is assumed to be set by a previous middleware.
@@ -219,7 +252,7 @@ func (app *Config) updateAccount(c echo.Context) error {
 	user.FirstName = newDetails.FirstName
 	user.LastName = newDetails.LastName
 	user.Email = newDetails.Email
-
+	user.Contact = newDetails.Contact
 	// Attempt to update the user in the database with the new details.
 	if err := user.UpdateUser(userId, user); err != nil {
 		// Check if the error is because the user does not exist in the database.

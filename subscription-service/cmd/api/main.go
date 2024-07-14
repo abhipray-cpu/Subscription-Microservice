@@ -5,11 +5,16 @@ import (
 	"fmt"                       // Used for formatting and printing output.
 	"log"                       // Used for logging error messages.
 	"subscription-service/auth" // Custom package for authentication.
+	"subscription-service/client"
 	"subscription-service/data" // Custom package for data models.
-	"time"                      // Used for time-related operations, such as delays.
+	"subscription-service/worker"
+	"sync"
+	"time" // Used for time-related operations, such as delays.
 
+	"github.com/aws/aws-sdk-go/service/sns"
 	"github.com/jackc/pgx/v4"     // PostgreSQL driver for Go.
 	"github.com/labstack/echo/v4" // Echo framework for building web applications.
+	"github.com/twilio/twilio-go"
 )
 
 // Config holds the application-wide configurations.
@@ -18,6 +23,8 @@ type Config struct {
 	Models   data.Models        // Data models for the application.
 	Auth     auth.Authenticator // Authentication mechanism.
 	Producer *Publisher         // Kafka producer for logging.
+	SNS      *sns.SNS           // SNS client for sending notifications.
+	TWILIO   *twilio.RestClient // Twilio client for sending SMS.
 }
 
 var app *Config // Global variable to hold the application configuration.
@@ -38,9 +45,34 @@ func init() {
 	} else {
 		fmt.Println("Message published successfully") // Confirm successful message publication.
 	}
+
+	// initializing new redis client
+	err = data.NewRedisClient("redis:6379", "")
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+		app.Producer.publishMessage("key", "Subscription Service", "Failed to connect to Redis")
+	}
+
+	// sns client
+	sns, err := client.NewSNSClient()
+	if err != nil {
+		log.Fatalf("Failed to create SNS client: %v", err)
+		app.Producer.publishMessage("key", "Subscription Service", "Failed to create SNS client")
+
+	}
+	// twilio client
+	twilio, err := client.TwilioClient()
+	if err != nil {
+		log.Fatalf("Failed to create Twilio client: %v", err)
+		app.Producer.publishMessage("key", "Subscription Service", "Failed to create Twilio client")
+
+	}
+	app.SNS = sns
+	app.TWILIO = twilio
 }
 
 func main() {
+	var wg sync.WaitGroup
 	conn, err := connect() // Connect to the database.
 	if err != nil {
 		log.Fatalf("Failed to connect to the database: %v", err) // Log and exit if the connection fails.
@@ -54,26 +86,33 @@ func main() {
 	app.Models = data.NewModels(conn) // Initialize the data models.
 	app.routes(e)                     // Set up the web routes.
 
-	app.Auth.NewAuth()                 // Initialize the authentication mechanism.
-	initialWaitTime := 1 * time.Second // Initial wait time for retrying server start.
-	maxRetries := 5                    // Maximum number of retries for starting the server.
-	factor := 2                        // Factor by which the wait time increases.
+	app.Auth.NewAuth() // Initialize the authentication mechanism.
 
-	// Attempt to start the server with exponential backoff.
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		err := e.Start(":80") // Attempt to start the server.
-		if err != nil {
-			log.Printf("Attempt %d: server failed to start: %v", attempt, err) // Log the failure.
-			if attempt == maxRetries {
-				app.Producer.publishMessage("key", "Subscription Service", "Server failed to start") // Log the final failure to Kafka.
-				log.Fatalf("Server failed to start after %d attempts", maxRetries)                   // Exit if the server fails to start after max retries.
+	wg.Add(1)
+	go func() {
+		initialWaitTime := 1 * time.Second // Initial wait time for retrying server start.
+		maxRetries := 5                    // Maximum number of retries for starting the server.
+		factor := 2                        // Factor by which the wait time increases.
+
+		// Attempt to start the server with exponential backoff.
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			err := e.Start(":80") // Attempt to start the server.
+			if err != nil {
+				log.Printf("Attempt %d: server failed to start: %v", attempt, err) // Log the failure.
+				if attempt == maxRetries {
+					app.Producer.publishMessage("key", "Subscription Service", "Server failed to start") // Log the final failure to Kafka.
+					log.Fatalf("Server failed to start after %d attempts", maxRetries)                   // Exit if the server fails to start after max retries.
+				}
+				time.Sleep(initialWaitTime)              // Wait before retrying.
+				initialWaitTime *= time.Duration(factor) // Increase the wait time.
+			} else {
+				break // Exit the loop if the server starts successfully.
 			}
-			time.Sleep(initialWaitTime)              // Wait before retrying.
-			initialWaitTime *= time.Duration(factor) // Increase the wait time.
-		} else {
-			break // Exit the loop if the server starts successfully.
 		}
-	}
+	}()
+	wg.Add(1)
+	go worker.StartWorker() // Start the Temporal worker.
+	wg.Wait()
 }
 
 // connect establishes a connection to the CockroachDB database.

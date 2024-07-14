@@ -2,8 +2,10 @@ cockroach-data/
 dynamicconfig/
 bin/
 pkg/
-data/mongo/
+data/mongo/*
 subscriptionApp
 listenerApp
 loggerApp
-.env
+*.env
+*.txt
+*.log
