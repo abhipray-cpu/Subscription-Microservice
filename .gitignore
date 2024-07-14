@@ -7,5 +7,4 @@ subscriptionApp
 listenerApp
 loggerApp
 *.env
-*.txt
 *.log
