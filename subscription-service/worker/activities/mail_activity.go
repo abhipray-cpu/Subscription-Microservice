@@ -1,13 +1,15 @@
 package activity
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ses"
 )
 
-func sendEmail(svc *ses.SES, to, subject, htmlBody string) error {
+// sendEmail encapsulates the functionality to send an email using AWS SES.
+func sendEmail(ctx context.Context, svc *ses.SES, to, subject, htmlBody string) error {
 	input := &ses.SendEmailInput{
 		Destination: &ses.Destination{
 			ToAddresses: []*string{aws.String(to)},
@@ -22,10 +24,11 @@ func sendEmail(svc *ses.SES, to, subject, htmlBody string) error {
 				Data: aws.String(subject),
 			},
 		},
-		Source: aws.String("dumkaabhipray@gmail.com"), // Replace with your sender email
+		Source: aws.String("your-sender-email@example.com"), // Replace with your sender email
 	}
 
-	_, err := svc.SendEmail(input)
+	// Send the email using the provided SES service with the standard context
+	_, err := svc.SendEmailWithContext(ctx, input)
 	if err != nil {
 		fmt.Println("Error sending email:", err)
 		return err
@@ -35,9 +38,10 @@ func sendEmail(svc *ses.SES, to, subject, htmlBody string) error {
 	return nil
 }
 
-func sendWelcomeEmail(svc *ses.SES, to string) error {
+// SendWelcomeEmail sends a welcome email to a new user.
+func SendWelcomeEmail(ctx context.Context, svc *ses.SES, to, name string) error {
 	subject := "Welcome to Our Service!"
-	htmlBody := `<html>
+	htmlBody := fmt.Sprintf(`<html>
 <head>
 <style>
 body {font-family: 'Arial', sans-serif; background-color: #f0f0f0; margin: 0; padding: 20px;}
@@ -49,16 +53,17 @@ p {color: #666666;}
 </head>
 <body>
 <div class="container">
-<h1>Welcome!</h1>
+<h1>Welcome, %s!</h1>
 <p>We're excited to have you on board. Click the button below to get started with our service.</p>
 <a href="https://yourwebsite.com/get-started" class="button">Get Started</a>
 </div>
 </body>
-</html>`
-	return sendEmail(svc, to, subject, htmlBody)
+</html>`, name)
+	return sendEmail(ctx, svc, to, subject, htmlBody)
 }
 
-func sendOTPEmail(svc *ses.SES, to, otpCode string) error {
+// sendOTPEmail sends an OTP email for account verification.
+func SendOTPEmail(ctx context.Context, svc *ses.SES, to, otpCode string) error {
 	subject := "Your OTP Code"
 	htmlBody := fmt.Sprintf(`<html>
 <head>
@@ -79,5 +84,5 @@ p {color: #666666;}
 </div>
 </body>
 </html>`, otpCode)
-	return sendEmail(svc, to, subject, htmlBody)
+	return sendEmail(ctx, svc, to, subject, htmlBody)
 }

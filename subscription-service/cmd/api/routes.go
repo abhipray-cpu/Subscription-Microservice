@@ -17,5 +17,6 @@ func (app *Config) routes(e *echo.Echo) {
 	g.DELETE("/", app.deleteAccount)                     // Delete account endpoint.
 	g.GET("/", app.getAccount)                           // Get account endpoint.
 	g.PUT("/", app.updateAccount)                        // Update account endpoint.
-
+	g.POST("/otp", app.GenerateOTP)                      // Generate OTP
+	g.POST("/verify", app.VerifyOTP)                     // Verify OTP
 }

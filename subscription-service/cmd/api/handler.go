@@ -269,3 +269,11 @@ func (app *Config) updateAccount(c echo.Context) error {
 	// Respond with HTTP 200 OK on successful update of the user account.
 	return c.JSON(http.StatusOK, "account updated successfully")
 }
+
+func (app *Config) GenerateOTP(c echo.Context) error {
+	return nil
+}
+
+func (app *Config) VerifyOTP(c echo.Context) error {
+	return nil
+}

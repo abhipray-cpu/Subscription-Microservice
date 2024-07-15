@@ -28,7 +28,12 @@ func GenerateOTP(ctx context.Context, rdb *redis.Client, userID string) (string,
 		// If OTP already exists, recursively call GenerateOTP to generate a new one
 		return GenerateOTP(ctx, rdb, userID)
 	} else {
-		// If OTP is unique, return it
+		// Store the OTP in Redis with an expiration time, e.g., 5 minutes
+		err := rdb.Set(ctx, key, otp, 5*time.Minute).Err()
+		if err != nil {
+			return "", err // Return error if any during Redis set
+		}
+		// If OTP is unique and stored successfully, return it
 		return otp, nil
 	}
 }

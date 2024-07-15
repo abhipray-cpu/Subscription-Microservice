@@ -25,17 +25,17 @@ down:
 ## build_subscription: builds the subscription binary as a linux executable
 build_subscription:
 	@echo "Building subscription binary..."
-	cd ../subscription-service && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ${SUBSCRIPTION_BINARY} ./cmd/api
+	cd ../subscription-service && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o ${SUBSCRIPTION_BINARY} ./cmd/api
 	@echo "Done!"
 
 ## build_listener: builds the listener binary as a linux executable
 build_listener:
 	@echo "Building listener binary..."
-	cd ../listener-service && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ${LISTENER_BINARY} ./cmd/api
+	cd ../listener-service && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o ${LISTENER_BINARY} ./cmd/api
 	@echo "Done!"
 
 ## build_logger: builds the logger binary as a linux executable
 build_logger:
 	@echo "Building logger binary..."
-	cd ../logger-service && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ${LOGGER_BINARY} ./cmd/api
+	cd ../logger-service && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o ${LOGGER_BINARY} ./cmd/api
 	@echo "Done!"

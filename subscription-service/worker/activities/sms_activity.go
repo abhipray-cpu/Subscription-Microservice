@@ -8,12 +8,12 @@ import (
 	openapi "github.com/twilio/twilio-go/rest/api/v2010"
 )
 
-func sendWelcomeSMS(client *twilio.RestClient, to string) error {
-	message := "🌟 Welcome to Our Service! 🌟\nWe're thrilled to have you on board. Stay tuned for updates."
+func SendWelcomeSMS(client *twilio.RestClient, to, name string) error {
+	message := fmt.Sprintf("🌟 Welcome to Our Service, %s! 🌟\nWe're thrilled to have you on board. Stay tuned for updates.", name)
 	return sendSMS(client, to, message)
 }
 
-func sendOTPSMS(client *twilio.RestClient, to string, otpCode string) error {
+func SendOTPSMS(client *twilio.RestClient, to string, otpCode string) error {
 	// Making the OTP stand out by using symbols and spacing
 	message := fmt.Sprintf("🔐 Your OTP is:\n\n🌟 %s 🌟\n\nUse this to complete your verification.", otpCode)
 	return sendSMS(client, to, message)

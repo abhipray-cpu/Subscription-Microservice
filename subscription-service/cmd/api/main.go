@@ -5,7 +5,7 @@ import (
 	"fmt"                       // Used for formatting and printing output.
 	"log"                       // Used for logging error messages.
 	"subscription-service/auth" // Custom package for authentication.
-	"subscription-service/client"
+	"subscription-service/clients"
 	"subscription-service/data" // Custom package for data models.
 	"subscription-service/worker"
 	"sync"
@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v4"     // PostgreSQL driver for Go.
 	"github.com/labstack/echo/v4" // Echo framework for building web applications.
 	"github.com/twilio/twilio-go"
+	"go.temporal.io/sdk/client"
 )
 
 // Config holds the application-wide configurations.
@@ -25,6 +26,7 @@ type Config struct {
 	Producer *Publisher         // Kafka producer for logging.
 	SNS      *sns.SNS           // SNS client for sending notifications.
 	TWILIO   *twilio.RestClient // Twilio client for sending SMS.
+	Temporal client.Client      // Temporal client for starting workers.
 }
 
 var app *Config // Global variable to hold the application configuration.
@@ -54,21 +56,30 @@ func init() {
 	}
 
 	// sns client
-	sns, err := client.NewSNSClient()
+	sns, err := clients.NewSNSClient()
 	if err != nil {
 		log.Fatalf("Failed to create SNS client: %v", err)
 		app.Producer.publishMessage("key", "Subscription Service", "Failed to create SNS client")
 
 	}
 	// twilio client
-	twilio, err := client.TwilioClient()
+	twilio, err := clients.TwilioClient()
 	if err != nil {
 		log.Fatalf("Failed to create Twilio client: %v", err)
 		app.Producer.publishMessage("key", "Subscription Service", "Failed to create Twilio client")
 
 	}
+
+	// temporal client
+	temporal, err := worker.StartWorker()
+	if err != nil {
+		log.Fatalf("Failed to start Temporal worker: %v", err)
+		app.Producer.publishMessage("key", "Subscription Service", "Failed to start Temporal worker")
+
+	}
 	app.SNS = sns
 	app.TWILIO = twilio
+	app.Temporal = temporal
 }
 
 func main() {
@@ -111,7 +122,6 @@ func main() {
 		}
 	}()
 	wg.Add(1)
-	go worker.StartWorker() // Start the Temporal worker.
 	wg.Wait()
 }
 
