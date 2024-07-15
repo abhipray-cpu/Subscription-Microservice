@@ -24,7 +24,7 @@ func sendEmail(ctx context.Context, svc *ses.SES, to, subject, htmlBody string) 
 				Data: aws.String(subject),
 			},
 		},
-		Source: aws.String("your-sender-email@example.com"), // Replace with your sender email
+		Source: aws.String("dumkaabhipray@gmail.com"), // Replace with your sender email
 	}
 
 	// Send the email using the provided SES service with the standard context
@@ -39,7 +39,7 @@ func sendEmail(ctx context.Context, svc *ses.SES, to, subject, htmlBody string) 
 }
 
 // SendWelcomeEmail sends a welcome email to a new user.
-func SendWelcomeEmail(ctx context.Context, svc *ses.SES, to, name string) error {
+func (ac *ActivitiesImpl) SendWelcomeEmail(ctx context.Context, to, name string) error {
 	subject := "Welcome to Our Service!"
 	htmlBody := fmt.Sprintf(`<html>
 <head>
@@ -59,11 +59,11 @@ p {color: #666666;}
 </div>
 </body>
 </html>`, name)
-	return sendEmail(ctx, svc, to, subject, htmlBody)
+	return sendEmail(ctx, ac.sesClient, to, subject, htmlBody)
 }
 
 // sendOTPEmail sends an OTP email for account verification.
-func SendOTPEmail(ctx context.Context, svc *ses.SES, to, otpCode string) error {
+func (ac *ActivitiesImpl) SendOTPEmail(ctx context.Context, to, otpCode string) error {
 	subject := "Your OTP Code"
 	htmlBody := fmt.Sprintf(`<html>
 <head>
@@ -84,5 +84,5 @@ p {color: #666666;}
 </div>
 </body>
 </html>`, otpCode)
-	return sendEmail(ctx, svc, to, subject, htmlBody)
+	return sendEmail(ctx, ac.sesClient, to, subject, htmlBody)
 }

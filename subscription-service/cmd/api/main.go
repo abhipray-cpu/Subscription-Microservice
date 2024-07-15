@@ -8,10 +8,15 @@ import (
 	"subscription-service/clients"
 	"subscription-service/data" // Custom package for data models.
 	"subscription-service/worker"
+	activity "subscription-service/worker/activities"
+	"subscription-service/worker/workflow"
 	"sync"
 	"time" // Used for time-related operations, such as delays.
 
-	"github.com/aws/aws-sdk-go/service/sns"
+	workers "go.temporal.io/sdk/worker"
+
+	"github.com/aws/aws-sdk-go/service/ses"
+	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v4"     // PostgreSQL driver for Go.
 	"github.com/labstack/echo/v4" // Echo framework for building web applications.
 	"github.com/twilio/twilio-go"
@@ -24,9 +29,10 @@ type Config struct {
 	Models   data.Models        // Data models for the application.
 	Auth     auth.Authenticator // Authentication mechanism.
 	Producer *Publisher         // Kafka producer for logging.
-	SNS      *sns.SNS           // SNS client for sending notifications.
+	SES      *ses.SES           // SNS client for sending notifications.
 	TWILIO   *twilio.RestClient // Twilio client for sending SMS.
 	Temporal client.Client      // Temporal client for starting workers.
+	Redis    *redis.Client      // Redis client for caching.
 }
 
 var app *Config // Global variable to hold the application configuration.
@@ -49,14 +55,15 @@ func init() {
 	}
 
 	// initializing new redis client
-	err = data.NewRedisClient("redis:6379", "")
+	redis, err := data.NewRedisClient("redis:6379", "")
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 		app.Producer.publishMessage("key", "Subscription Service", "Failed to connect to Redis")
 	}
+	app.Redis = redis
 
 	// sns client
-	sns, err := clients.NewSNSClient()
+	ses, err := clients.NewSESClient()
 	if err != nil {
 		log.Fatalf("Failed to create SNS client: %v", err)
 		app.Producer.publishMessage("key", "Subscription Service", "Failed to create SNS client")
@@ -77,7 +84,7 @@ func init() {
 		app.Producer.publishMessage("key", "Subscription Service", "Failed to start Temporal worker")
 
 	}
-	app.SNS = sns
+	app.SES = ses
 	app.TWILIO = twilio
 	app.Temporal = temporal
 }
@@ -98,7 +105,7 @@ func main() {
 	app.routes(e)                     // Set up the web routes.
 
 	app.Auth.NewAuth() // Initialize the authentication mechanism.
-
+	defer app.Temporal.Close()
 	wg.Add(1)
 	go func() {
 		initialWaitTime := 1 * time.Second // Initial wait time for retrying server start.
@@ -122,6 +129,16 @@ func main() {
 		}
 	}()
 	wg.Add(1)
+	go func() {
+		activities := activity.NewActivities(app.SES, app.TWILIO, app.Redis)
+		w := workers.New(app.Temporal, "subscription-service", workers.Options{})
+		w.RegisterWorkflow(workflow.WelcomeWorkflow)
+		w.RegisterWorkflow(workflow.OTPWorkflow)
+		w.RegisterActivity(activities)
+		if err := w.Run(workers.InterruptCh()); err != nil {
+			app.Producer.publishMessage("key", "Subscription Service", "Failed to start Temporal worker"+err.Error())
+		}
+	}()
 	wg.Wait()
 }
 

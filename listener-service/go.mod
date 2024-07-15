@@ -3,6 +3,7 @@ module listener-service
 go 1.22.3
 
 require (
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/segmentio/kafka-go v0.4.47
 )

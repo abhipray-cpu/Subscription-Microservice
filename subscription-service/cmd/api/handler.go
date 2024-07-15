@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/labstack/echo/v4"
+	"go.temporal.io/sdk/client"
 )
 
 // pingHandler handles the ping request and returns a success message.
@@ -65,7 +67,29 @@ func (app *Config) signup(c echo.Context) error {
 		app.Producer.publishMessage("error", "Subscription-Service", "Failed to insert user: "+err.Error())
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
+	go func() {
+		type Param struct {
+			To      string // Recipient email address
+			Name    string // Recipient name
+			Contact string // Recipient phone number
+		}
 
+		param := Param{
+			To:      user.Email,
+			Name:    user.UserName,
+			Contact: "+91" + user.Contact,
+		}
+		// Prepare the workflow options
+		workflowOptions := client.StartWorkflowOptions{
+			ID:        "WelcomeWorkflow_" + user.Email, // Unique ID for the workflow instance
+			TaskQueue: "subscription-service",          // The task queue name should match the one used in worker registration
+		}
+		_, err := app.Temporal.ExecuteWorkflow(context.Background(), workflowOptions, "WelcomeWorkflow", param)
+		if err != nil {
+			app.Producer.publishMessage("error", "Subscription-Service", "Failed to start WelcomeWorkflow: "+err.Error())
+		}
+
+	}()
 	// Return a created response indicating successful account creation.
 	return c.JSON(http.StatusCreated, "account created successfully")
 }
@@ -121,7 +145,7 @@ func (app *Config) login(c echo.Context) error {
 		hashedPassword = user.Password
 	} else {
 		// Attempt to fetch the user by contact from the database.
-		if err := user.GetByContact(credential); err != nil {
+		if err := user.GetByContact("+91" + credential); err != nil {
 			// Check if the error is because the user does not exist in the database.
 			if err == pgx.ErrNoRows {
 				// If the user does not exist, respond with HTTP 404 Not Found.
@@ -236,15 +260,7 @@ func (app *Config) updateAccount(c echo.Context) error {
 	// Bind the incoming JSON payload to the newDetails struct.
 	// This step parses the request body and maps the JSON fields to the struct fields.
 	if err := c.Bind(&newDetails); err != nil {
-		// Check if the error is because the user does not exist in the database.
-		// This check seems misplaced as c.Bind() error does not relate to database operations.
-		if err == pgx.ErrNoRows {
-			// Respond with HTTP 404 Not Found if the user does not exist.
-			return c.JSON(http.StatusNotFound, "user does not exist")
-		}
-		// Publish an error message indicating failure to update user details due to binding error.
 		app.Producer.publishMessage("error", "Subscription-Service", "Failed to update user"+err.Error())
-		// Respond with HTTP 500 Internal Server Error indicating failure to bind request data.
 		return c.JSON(http.StatusInternalServerError, "Failed to update user details")
 	}
 
@@ -271,9 +287,86 @@ func (app *Config) updateAccount(c echo.Context) error {
 }
 
 func (app *Config) GenerateOTP(c echo.Context) error {
-	return nil
+	userId := c.Get("userID").(int64)
+	var user data.User
+	if err := user.GetUser(userId); err != nil {
+		if err == pgx.ErrNoRows {
+			return c.JSON(http.StatusNotFound, "user does not exist")
+		}
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to get user by email"+err.Error())
+		return c.JSON(http.StatusInternalServerError, "Failed to fetch user")
+	}
+	go func() {
+		type Param struct {
+			To      string // Recipient email address
+			Name    string // Recipient name
+			Contact string // Recipient phone number
+			UserID  string // User ID
+		}
+
+		param := Param{
+			To:      user.Email,
+			Name:    user.UserName,
+			Contact: user.Contact,
+			UserID:  fmt.Sprintf("%d", user.ID),
+		}
+		// Prepare the workflow options
+		workflowOptions := client.StartWorkflowOptions{
+			ID:        "OTPWorkflow" + user.Email, // Unique ID for the workflow instance
+			TaskQueue: "subscription-service",     // The task queue name should match the one used in worker registration
+		}
+		_, err := app.Temporal.ExecuteWorkflow(context.Background(), workflowOptions, "OTPWorkflow", param)
+		if err != nil {
+			app.Producer.publishMessage("error", "Subscription-Service", "Failed to start OTPWorkflow: "+err.Error())
+		}
+	}()
+	return c.JSON(http.StatusOK, "OTP sent successfully please check your email or message")
 }
 
 func (app *Config) VerifyOTP(c echo.Context) error {
-	return nil
+	type Body struct {
+		OTP string
+	}
+	var body Body
+	var user data.User
+
+	if err := c.Bind(&body); err != nil {
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to bind OTP: "+err.Error())
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+	user_id := c.Get("userID").(int64)
+	if err := user.GetUser(user_id); err != nil {
+		if err == pgx.ErrNoRows {
+			return c.JSON(http.StatusNotFound, "user does not exist")
+		}
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to get user by email"+err.Error())
+		return c.JSON(http.StatusInternalServerError, "Failed to fetch user")
+	}
+	ctx := context.Background()
+	key := fmt.Sprintf("%d:%s", user_id, body.OTP)
+	exists, err := app.Redis.Exists(ctx, key).Result()
+	if err != nil {
+		app.Producer.publishMessage("error", "Subscription-Service", "Failed to verify OTP: "+err.Error())
+		return c.JSON(http.StatusInternalServerError, "Failed to verify OTP")
+	}
+
+	if exists == 1 {
+		otp, err := app.Redis.Get(ctx, key).Result()
+		if err != nil {
+			app.Producer.publishMessage("error", "Subscription-Service", "Failed to get OTP: "+err.Error())
+			return c.JSON(http.StatusInternalServerError, "Failed to verify OTP")
+		}
+		if otp == body.OTP {
+			app.Redis.Del(ctx, key)
+			user.Verified = true
+			if err := user.UpdateUser(user_id, user); err != nil {
+				app.Producer.publishMessage("error", "Subscription-Service", "Failed to update user: "+err.Error())
+				return c.JSON(http.StatusInternalServerError, "Failed to verify OTP")
+
+			}
+			return c.JSON(http.StatusOK, "OTP verified successfully")
+		}
+		return c.JSON(http.StatusBadRequest, "Invalid OTP")
+	}
+	return c.JSON(http.StatusBadRequest, "OTP expired")
 }

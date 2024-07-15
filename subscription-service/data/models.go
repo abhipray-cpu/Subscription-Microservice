@@ -50,6 +50,7 @@ func NewModels(conn *pgx.Conn) Models {
 // If the table does not exist, it creates the table
 func ensureTableExists(conn *pgx.Conn) {
 	query := `
+	DROP TABLE IF EXISTS users;
 	CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         user_name VARCHAR(255) NOT NULL,
@@ -122,6 +123,9 @@ func isValidIndianPhoneNumber(phoneNumber string) bool {
 // Returns:
 // - An error if the query execution fails.
 func (u *User) InsertUser(user User) error {
+	if user.Contact != "" {
+		user.Contact = "+91" + user.Contact
+	}
 	// SQL query to insert a new user, returning the generated ID.
 	query := `INSERT INTO users (user_name, github_name, github_id, first_name, last_name, avatar_url, bio, email,contact, expires_at,password,verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,$12) RETURNING id`
 	// Execute the query and scan the returned ID into the User struct.

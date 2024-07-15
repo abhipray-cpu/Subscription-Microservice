@@ -7,15 +7,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sns"
+	"github.com/aws/aws-sdk-go/service/ses"
 )
 
-func NewSNSClient() (*sns.SNS, error) {
-	// // Load .env file
-	// if err := godotenv.Load(); err != nil {
-	// 	return nil, fmt.Errorf("error loading .env file: %w", err)
-	// }
-
+func NewSESClient() (*ses.SES, error) {
 	// Get AWS credentials and region from environment variables
 	awsAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
 	awsSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
@@ -30,9 +25,9 @@ func NewSNSClient() (*sns.SNS, error) {
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
-	// Create a new SNS client
-	svc := sns.New(sess)
+	// Create a new SES client
+	svc := ses.New(sess)
 
-	// Return the SNS client
+	// Return the SES client
 	return svc, nil
 }
