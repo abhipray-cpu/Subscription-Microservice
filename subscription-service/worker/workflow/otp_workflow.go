@@ -14,6 +14,9 @@ type OTPParams struct {
 	UserID  string // User ID
 }
 
+// OTPWorkflow is a Temporal workflow that orchestrates the OTP generation and sending process.
+// It takes in a context and OTPParams and returns an error.
+// It schedules the GenerateOTP activity with the user ID.
 func OTPWorkflow(ctx workflow.Context, params OTPParams) error {
 	// Define activity options, if needed
 	ao := workflow.ActivityOptions{

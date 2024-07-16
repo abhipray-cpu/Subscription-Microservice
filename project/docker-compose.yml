@@ -216,6 +216,22 @@ services:
       mode: replicated
       replicas: 1 # Defines the number of replicas for the service
 
+  # payment service
+  payment-service:
+    build:
+      context: ./../payment-service
+      dockerfile: ./../payment-service/payment-service.dockerfile
+    restart: always
+    depends_on:
+      - cockroach
+    networks:
+      - temporal-network
+    ports:
+      - "8085:80"
+    deploy:
+      mode: replicated
+      replicas: 1 # Defines the number of replicas for the service
+
 networks:
   temporal-network:
     driver: bridge

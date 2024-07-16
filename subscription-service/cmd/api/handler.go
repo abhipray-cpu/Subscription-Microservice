@@ -286,6 +286,7 @@ func (app *Config) updateAccount(c echo.Context) error {
 	return c.JSON(http.StatusOK, "account updated successfully")
 }
 
+// GenerateOTP generates an OTP and sends it to the user's email or phone number.
 func (app *Config) GenerateOTP(c echo.Context) error {
 	userId := c.Get("userID").(int64)
 	var user data.User
@@ -323,6 +324,7 @@ func (app *Config) GenerateOTP(c echo.Context) error {
 	return c.JSON(http.StatusOK, "OTP sent successfully please check your email or message")
 }
 
+// VerifyOTP verifies the OTP sent to the user's email or phone number.
 func (app *Config) VerifyOTP(c echo.Context) error {
 	type Body struct {
 		OTP string

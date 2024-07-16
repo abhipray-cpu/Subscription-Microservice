@@ -6,6 +6,6 @@ FROM golang:bookworm
 
 RUN mkdir /app
 
-COPY loggerApp /app
+COPY paymentApp /app
 
-CMD [ "/app/loggerApp"]
+CMD [ "/app/paymentApp"]

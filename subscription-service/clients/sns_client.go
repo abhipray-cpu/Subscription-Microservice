@@ -10,6 +10,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ses"
 )
 
+// NewSESClient initializes and returns an SES client or an error.
+// It reads the AWS credentials and region from environment variables.
+// It returns an error if the session cannot be created.
+// It returns an SES client if the session is created successfully.
+// It returns an error if the SES client cannot be created.
 func NewSESClient() (*ses.SES, error) {
 	// Get AWS credentials and region from environment variables
 	awsAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")

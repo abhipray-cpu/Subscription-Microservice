@@ -14,6 +14,9 @@ type WelcomeParams struct {
 	Contact string // Recipient phone number
 }
 
+// WelcomeWorkflow is a Temporal workflow that orchestrates the welcome email and SMS sending process.
+// It takes in a context and WelcomeParams and returns an error.
+// It schedules the SendWelcomeEmail and SendWelcomeSMS activities with the recipient email address and phone number.
 func WelcomeWorkflow(ctx workflow.Context, params WelcomeParams) error {
 	// Define activity options, if needed
 	ao := workflow.ActivityOptions{

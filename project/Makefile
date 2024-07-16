@@ -2,6 +2,7 @@ SHELL=/bin/bash
 SUBSCRIPTION_BINARY=subscriptionApp
 LISTENER_BINARY=listenerApp
 LOGGER_BINARY=loggerApp
+PAYMENT_BINARY=paymentApp
 ## up: starts all containers in the background without forcing build
 up:
 	@echo "Starting Docker images..."
@@ -9,7 +10,7 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_subscription build_listener build_logger
+up_build: build_subscription build_listener build_logger build_payment
 	@echo "Stopping docker images (if running)..."
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
@@ -38,4 +39,10 @@ build_listener:
 build_logger:
 	@echo "Building logger binary..."
 	cd ../logger-service && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o ${LOGGER_BINARY} ./cmd/api
+	@echo "Done!"
+
+## build_payment: builds the payment binary as a linux executable
+build_payment:
+	@echo "Building payment binary..."
+	cd ../payment-service && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -o ${PAYMENT_BINARY} ./cmd/api
 	@echo "Done!"
