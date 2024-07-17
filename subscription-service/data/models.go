@@ -13,20 +13,22 @@ import (
 
 // User represents a user entity in the system with various attributes.
 type User struct {
-	ID          int64     `json:"id"`          // Unique identifier for the user.
-	UserName    string    `json:"userName"`    // Username of the user.
-	GithubName  string    `json:"githubName"`  // GitHub username of the user.
-	GithubId    string    `json:"githubId"`    // GitHub ID of the user.
-	FirstName   string    `json:"firstName"`   // First name of the user.
-	LastName    string    `json:"lastName"`    // Last name of the user.
-	AvatarUrl   string    `json:"avatarUrl"`   // URL of the user's avatar.
-	AccessToken string    `json:"accessToken"` // Access token for authentication.
-	Bio         string    `json:"bio"`         // Biography of the user.
-	Email       string    `json:"email"`       // Email address of the user.
-	Contact     string    `json:"contact"`     // Contact number of the user.
-	ExpiresAt   time.Time `json:"expiresAt"`   // Expiration time of the user's session or token.
-	Password    string    `json:"password"`    // Password of the user.
-	Verified    bool      `json:"verified"`    // Verification status of the user.
+	ID               int64     `json:"id"`               // Unique identifier for the user.
+	UserName         string    `json:"userName"`         // Username of the user.
+	GithubName       string    `json:"githubName"`       // GitHub username of the user.
+	GithubId         string    `json:"githubId"`         // GitHub ID of the user.
+	FirstName        string    `json:"firstName"`        // First name of the user.
+	LastName         string    `json:"lastName"`         // Last name of the user.
+	AvatarUrl        string    `json:"avatarUrl"`        // URL of the user's avatar.
+	AccessToken      string    `json:"accessToken"`      // Access token for authentication.
+	Bio              string    `json:"bio"`              // Biography of the user.
+	Email            string    `json:"email"`            // Email address of the user.
+	Contact          string    `json:"contact"`          // Contact number of the user.
+	ExpiresAt        time.Time `json:"expiresAt"`        // Expiration time of the user's session or token.
+	Password         string    `json:"password"`         // Password of the user.
+	Verified         bool      `json:"verified"`         // Verification status of the user.
+	SubscriptionID   float64   `json:"subscriptionId"`   // Subscription ID of the user.
+	SubscriptionType string    `json:"subscriptionType"` // Subscription type of the user.
 }
 
 // connection holds a global database connection, shared across instances of Models.
@@ -65,7 +67,9 @@ func ensureTableExists(conn *pgx.Conn) {
         expires_at TIMESTAMP NOT NULL,
 		password VARCHAR(255) NOT NULL,
 		contact VARCHAR(255) UNIQUE,
-		verified BOOLEAN DEFAULT FALSE
+		verified BOOLEAN DEFAULT FALSE,
+		subscription_id FLOAT UNIQUE,
+		subscription_type VARCHAR(255)
     );`
 
 	if _, err := conn.Exec(context.Background(), query); err != nil {

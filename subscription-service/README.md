@@ -62,3 +62,4 @@ This is the entrypoint of the entire system this listens to incoming request and
 - data: this package initializes all the storage interfaces
 - util: this provides all the utilities functionalities
 - worker: this package is for handling temporal workflows and activities
+- temporal-ui: Will be  available on localhost:8080, you can monitor all the ongoinf workflows here

@@ -224,10 +224,14 @@ services:
     restart: always
     depends_on:
       - cockroach
+      - subscription-service
     networks:
       - temporal-network
     ports:
       - "8085:80"
+    environment:
+      - LEMON_SQUEEZY_API_KEY=${WEBHOOK_SECRET}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
     deploy:
       mode: replicated
       replicas: 1 # Defines the number of replicas for the service
