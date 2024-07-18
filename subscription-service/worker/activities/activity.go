@@ -16,6 +16,10 @@ type Activites interface {
 	SendOTPSMS(to string, otpCode string) error
 	SendOTPEmail(ctx context.Context, to, otpCode string) error
 	GenerateOTP(ctx context.Context, userID string) (string, error)
+	GetUser(email string) (UserResponse, error)
+	UpdateSubscription(id int64, subscriptionStatus string, subscriptionId float64, subscriptionType string) error
+	SendSubscriptionUpdateSMS(to, subscriptionName, status string) error
+	SendSubscriptionStatusEmail(ctx context.Context, to string, subscriptionID float64, subscriptionName, status string) error
 }
 
 // ActivitiesImpl is an implementation of the Activites interface.

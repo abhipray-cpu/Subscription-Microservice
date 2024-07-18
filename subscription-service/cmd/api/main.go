@@ -1,12 +1,14 @@
 package main
 
 import (
-	"context"                   // Provides functionality for managing request lifecycles.
-	"fmt"                       // Used for formatting and printing output.
-	"log"                       // Used for logging error messages.
+	"context" // Provides functionality for managing request lifecycles.
+	"fmt"     // Used for formatting and printing output.
+	"log"     // Used for logging error messages.
+	"net"
 	"subscription-service/auth" // Custom package for authentication.
 	"subscription-service/clients"
 	"subscription-service/data" // Custom package for data models.
+	"subscription-service/grpc/pb"
 	"subscription-service/worker"
 	activity "subscription-service/worker/activities"
 	"subscription-service/worker/workflow"
@@ -14,6 +16,7 @@ import (
 	"time" // Used for time-related operations, such as delays.
 
 	workers "go.temporal.io/sdk/worker"
+	"google.golang.org/grpc"
 
 	"github.com/aws/aws-sdk-go/service/ses"
 	"github.com/go-redis/redis/v8"
@@ -134,9 +137,24 @@ func main() {
 		w := workers.New(app.Temporal, "subscription-service", workers.Options{})
 		w.RegisterWorkflow(workflow.WelcomeWorkflow)
 		w.RegisterWorkflow(workflow.OTPWorkflow)
+		w.RegisterWorkflow(workflow.SubscriptionWorkflow)
 		w.RegisterActivity(activities)
 		if err := w.Run(workers.InterruptCh()); err != nil {
 			app.Producer.publishMessage("key", "Subscription Service", "Failed to start Temporal worker"+err.Error())
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		lis, err := net.Listen("tcp", ":50051")
+		if err != nil {
+			log.Fatalf("failed to listen: %v", err)
+		}
+		s := grpc.NewServer()
+		pb.RegisterSubscriptionServiceServer(s, NewServer())
+
+		log.Printf("Server listening at %v", lis.Addr())
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
 	wg.Wait()

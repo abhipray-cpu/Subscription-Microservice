@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ses"
@@ -84,5 +85,30 @@ p {color: #666666;}
 </div>
 </body>
 </html>`, otpCode)
+	return sendEmail(ctx, ac.sesClient, to, subject, htmlBody)
+}
+
+// send subscrition email
+func (ac *ActivitiesImpl) SendSubscriptionStatusEmail(ctx context.Context, to string, subscriptionID float64, subscriptionName, status string) error {
+	// Convert float64 subscriptionID to string with desired precision and format
+	subscriptionIDStr := strconv.FormatFloat(subscriptionID, 'f', -1, 64)
+	subject := fmt.Sprintf("Subscription is %s", status)
+	htmlBody := fmt.Sprintf(`<html>
+<head>
+<style>
+body {font-family: 'Arial', sans-serif; background-color: #f0f0f0; margin: 0; padding: 20px;}
+.container {background-color: #ffffff; padding: 20px; max-width: 600px; margin: auto; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);}
+h1 {color: #333366;}
+p {color: #666666;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>%s</h1>
+<p>Your subscription ID <b>%s</b> with the name <b>%s</b> is now <b>%s</b>.</p>
+<p>If you did not request this, please ignore this email.</p>
+</div>
+</body>
+</html>`, subject, subscriptionIDStr, subscriptionName, status)
 	return sendEmail(ctx, ac.sesClient, to, subject, htmlBody)
 }

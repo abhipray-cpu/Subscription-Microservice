@@ -13,22 +13,23 @@ import (
 
 // User represents a user entity in the system with various attributes.
 type User struct {
-	ID               int64     `json:"id"`               // Unique identifier for the user.
-	UserName         string    `json:"userName"`         // Username of the user.
-	GithubName       string    `json:"githubName"`       // GitHub username of the user.
-	GithubId         string    `json:"githubId"`         // GitHub ID of the user.
-	FirstName        string    `json:"firstName"`        // First name of the user.
-	LastName         string    `json:"lastName"`         // Last name of the user.
-	AvatarUrl        string    `json:"avatarUrl"`        // URL of the user's avatar.
-	AccessToken      string    `json:"accessToken"`      // Access token for authentication.
-	Bio              string    `json:"bio"`              // Biography of the user.
-	Email            string    `json:"email"`            // Email address of the user.
-	Contact          string    `json:"contact"`          // Contact number of the user.
-	ExpiresAt        time.Time `json:"expiresAt"`        // Expiration time of the user's session or token.
-	Password         string    `json:"password"`         // Password of the user.
-	Verified         bool      `json:"verified"`         // Verification status of the user.
-	SubscriptionID   float64   `json:"subscriptionId"`   // Subscription ID of the user.
-	SubscriptionType string    `json:"subscriptionType"` // Subscription type of the user.
+	ID                 int64     `json:"id"`                 // Unique identifier for the user.
+	UserName           string    `json:"userName"`           // Username of the user.
+	GithubName         string    `json:"githubName"`         // GitHub username of the user.
+	GithubId           string    `json:"githubId"`           // GitHub ID of the user.
+	FirstName          string    `json:"firstName"`          // First name of the user.
+	LastName           string    `json:"lastName"`           // Last name of the user.
+	AvatarUrl          string    `json:"avatarUrl"`          // URL of the user's avatar.
+	AccessToken        string    `json:"accessToken"`        // Access token for authentication.
+	Bio                string    `json:"bio"`                // Biography of the user.
+	Email              string    `json:"email"`              // Email address of the user.
+	Contact            string    `json:"contact"`            // Contact number of the user.
+	ExpiresAt          time.Time `json:"expiresAt"`          // Expiration time of the user's session or token.
+	Password           string    `json:"password"`           // Password of the user.
+	Verified           bool      `json:"verified"`           // Verification status of the user.
+	SubscriptionStatus string    `json:"subscriptionStatus"` // Subscription status of the user.
+	SubscriptionID     float64   `json:"subscriptionId"`     // Subscription ID of the user.
+	SubscriptionType   string    `json:"subscriptionType"`   // Subscription type of the user.
 }
 
 // connection holds a global database connection, shared across instances of Models.
@@ -68,6 +69,7 @@ func ensureTableExists(conn *pgx.Conn) {
 		password VARCHAR(255) NOT NULL,
 		contact VARCHAR(255) UNIQUE,
 		verified BOOLEAN DEFAULT FALSE,
+		subscription_status VARCHAR(255),
 		subscription_id FLOAT UNIQUE,
 		subscription_type VARCHAR(255)
     );`
@@ -170,6 +172,24 @@ func (u *User) UpdateUser(id int64, updatedUser User) error {
 	query := `UPDATE users SET user_name=$1, first_name=$2, last_name=$3,bio=$4, email=$5,contact=$6, verified=$7 WHERE id=$8`
 	// Execute the query without returning any result.
 	_, err := connection.Exec(context.Background(), query, updatedUser.UserName, updatedUser.FirstName, updatedUser.LastName, updatedUser.Bio, updatedUser.Email, updatedUser.Contact, updatedUser.Verified, id)
+	if err != nil {
+		return err // Return any errors encountered.
+	}
+	return nil // Return nil on success.
+}
+
+// UpdateUserSubscription updates an existing user's subscription status and name in the database.
+// Parameters:
+// - id: The ID of the user whose subscription is to be updated.
+// - status: The new subscription status.
+// - name: The new subscription name.
+// Returns:
+// - An error if the query execution fails.
+func (u *User) UpdateUserSubscription(id int64, subscriptionStatus string, subscriptionId float64, subscriptionType string) error {
+	// SQL query to update a user's subscription status and name by ID.
+	query := `UPDATE users SET subscription_status=$1, subscription_id=$2, subscription_type=$3 WHERE id=$4`
+	// Execute the query without returning any result.
+	_, err := connection.Exec(context.Background(), query, subscriptionStatus, subscriptionId, subscriptionType, id)
 	if err != nil {
 		return err // Return any errors encountered.
 	}

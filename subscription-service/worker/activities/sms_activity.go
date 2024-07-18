@@ -19,6 +19,11 @@ func (ac *ActivitiesImpl) SendOTPSMS(to string, otpCode string) error {
 	return sendSMS(ac.twilioClient, to, message)
 }
 
+func (ac *ActivitiesImpl) SendSubscriptionUpdateSMS(to, subscriptionName, status string) error {
+	message := fmt.Sprintf("📢 Update on your subscription: %s 📢\nYour subscription '%s' is now %s.", subscriptionName, subscriptionName, status)
+	return sendSMS(ac.twilioClient, to, message)
+}
+
 func sendSMS(client *twilio.RestClient, to string, message string) error {
 	params := &openapi.CreateMessageParams{}
 	params.SetTo(to)
