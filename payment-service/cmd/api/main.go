@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"log"
 	"payment-service/data"
+	"payment-service/grpc/subscription"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/labstack/echo/v4"
+	"google.golang.org/grpc"
 )
 
 type Config struct {
-	Models   data.Models // Data models for the application.
-	Producer *Publisher  // Kafka producer for logging.
+	Models                    data.Models // Data models for the application.
+	Producer                  *Publisher  // Kafka producer for logging.
+	SubscriptionServiceClient subscription.SubscriptionServiceClient
 }
 
 var app *Config
@@ -40,6 +43,13 @@ func main() {
 	e := echo.New()
 	defer e.Close()
 	app.Models = data.NewModels(conn)
+	grpcConn, err := NewGrpcClient("subscription-service:50051")
+	if err != nil {
+		app.Producer.publishMessage("key", "Payment Service", "Failed to connect to the subscription service"+err.Error())
+	}
+	defer grpcConn.Close()
+	subscriptionClient := subscription.NewSubscriptionServiceClient(grpcConn)
+	app.SubscriptionServiceClient = subscriptionClient
 	app.routes(e)
 	wg.Add(1)
 	go func() {
@@ -76,4 +86,14 @@ func connect() (*pgx.Conn, error) {
 	}
 	fmt.Println("Connected to the database") // Confirm successful connection.
 	return conn, nil                         // Return the database connection.
+}
+
+func NewGrpcClient(serverAddress string) (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(serverAddress, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+		return nil, err
+	}
+	fmt.Println("Connected to the subscription service: ", serverAddress)
+	return conn, nil
 }

@@ -6,5 +6,6 @@ data/mongo/*
 subscriptionApp
 listenerApp
 loggerApp
+paymentApp
 *.env
 *.log

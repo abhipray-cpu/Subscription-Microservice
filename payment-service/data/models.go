@@ -112,6 +112,8 @@ func (m *Models) GetPaymentByID(id int) (*Payment, error) {
 	return &p, nil
 }
 
+// GetPaymentBySubscriptionID updated to include new fields
+// GetPaymentBySubscriptionID retrieves a payment record based on the subscription ID.
 func (m *Models) GetPaymentBySubscriptionID(subscriptionID string) (*Payment, error) {
 	query := `
     SELECT id, customer_id, subscription_id, order_id, status, variant_name, variant_id, product_id, product_name, card_brand, card_last_four, user_name, user_email, renews_at, created_at, updated_at
@@ -142,6 +144,8 @@ func (m *Models) UpdatePayment(p Payment) error {
 	return nil
 }
 
+// GetPayment updated to include new fields
+// GetPayment parses the JSON request body and returns a Payment object.
 func GetPayment(body []byte) (*Payment, error) {
 	var params map[string]interface{}
 	err := json.Unmarshal(body, &params)

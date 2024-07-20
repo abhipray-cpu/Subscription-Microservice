@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package subscription;
+
+option go_package= "./subscription";
+
+// The subscription service definition.
+service SubscriptionService {
+  // Sends subscription details for processing
+  rpc ProcessSubscription (SubscriptionRequest) returns (SubscriptionResponse) {}
+}
+
+// The request message containing the subscription details.
+message SubscriptionRequest {
+  string mailType = 1;
+  string emailId = 2;
+  string subscriptionStatus = 3;
+  string productName = 4;
+  string variantName = 5;
+}
+
+// The response message containing the result of the subscription process.
+message SubscriptionResponse {
+  bool success = 1;
+  string message = 2;
+}
