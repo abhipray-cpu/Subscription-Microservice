@@ -1,51 +1,114 @@
 # Go Microservice Template
 
-This project is a template for building microservices in Go. It provides a basic setup for developing, testing, and deploying Go-based microservices with an emphasis on clean architecture and best practices.
+## Overview
+
+This Go Microservice Template is meticulously engineered to streamline the management of subscriptions, serving as the backbone for subscription-based services. It is crafted with the intent to provide a robust, scalable solution that caters to the dynamic needs of subscription management, including user subscriptions, billing cycles, and notification services.
+
+Leveraging the power of Go, this template not only promises high performance and reliability but also emphasizes clean architecture and best practices. It is equipped to handle high volumes of transactions with ease, ensuring data integrity and security are never compromised.
+
+
 
 ## Features
 
-- **Clean Architecture**: Organized according to the Clean Architecture principles for easy maintenance and scalability.
-- **RESTful API**: A simple RESTful API setup using Gorilla Mux for routing.
-- **Docker Support**: Includes Dockerfile for building and running the microservice in a Docker container.
-- **Logging**: Integrated logging for easy debugging and monitoring.
-- **Configuration Management**: Utilizes Viper for managing configurations from files and environment variables.
-- **Health Check Endpoint**: A health check endpoint for checking the service status.
-- **Unit and Integration Tests**: Basic setup for writing unit and integration tests using the testing package.
+- **Scalability at Its Core**: Designed from the ground up to scale seamlessly with your needs. Whether you're handling hundreds or millions of users, this microservice adapts to your growth, ensuring that your subscription services remain fast, efficient, and reliable.
+
+- **CockroachDB Integration**: Utilizes CockroachDB, the resilient, distributed SQL database, for managing user data and payment information. This ensures your data is always available, consistent, and secured, even in the face of hardware failures or data center outages.
+
+- **Global Log Collection Service**: Features a sophisticated log collection service that aggregates logs from all related services, including user management and payment processing. This centralized approach simplifies monitoring and debugging, providing clear insights into the health and performance of your subscription services.
+
+- **Lemon Squeezy for Subscription Management**: Employs Lemon Squeezy for an effortless subscription management experience. This integration allows for easy setup of subscription plans, handling of recurring payments, and management of customer accounts, all within a user-friendly interface.
+
+- **Temporal for Workflow Orchestration**: Incorporates Temporal to architect scalable and resilient workflows. Whether it's automating billing cycles, managing user subscriptions, or orchestrating communication between services, Temporal ensures that your workflows are robust, fault-tolerant, and easy to manage.
+
+
+## Architecture
+
+![System Design](./project/Subscription%20Microservice.png)
+
+## Prerequisites
+
+Before you begin, ensure you have met the following requirements:
+
+- **Go**: The microservice is developed in Go. Ensure you have Go installed on your machine. The minimum version required is Go 1.15. You can download it from [the Go website](https://golang.org/dl/).
+
+- **Docker**: For containerization and running dependencies such as databases or other services in isolated environments. Download Docker from [the Docker website](https://www.docker.com/get-started).
+
+- **CockroachDB**: This microservice uses CockroachDB for managing user data and payments. You can run CockroachDB locally as a standalone binary, in a Docker container, or use CockroachDB Cloud. Instructions can be found on [the CockroachDB documentation page](https://www.cockroachlabs.com/docs/stable/start-a-local-cluster.html).
+
+- **Temporal**: For orchestrating workflows, Temporal must be set up. You can run Temporal locally using Docker. Find the setup instructions on [the Temporal documentation site](https://docs.temporal.io/docs/server/quick-install).
+
+- **Git**: To clone the repository and manage version control. Download Git from [the Git website](https://git-scm.com/downloads).
+
+- **An IDE or Text Editor**: While not strictly necessary, having an Integrated Development Environment (IDE) like Visual Studio Code, GoLand, or a text editor such as Sublime Text or Atom can be very helpful for development.
+
+Ensure all the above prerequisites are installed and properly configured before proceeding with the installation of the microservice.
+
 
 ## Getting Started
 
-### Prerequisites
+- **Clone the directory**: [git clone](https://github.com/abhipray-cpu/Subscription-Microservice.git) 
 
-- Go 1.15 or higher
-- Docker (optional for containerization)
+- **Install the dependencies**: go mod tidy
+
+- **Set the env variables for both project and other services**
+
+- **Run ngrok for webhook testing**
+
+### Installation
+
+### Installation
+
+Follow this step-by-step guide to install all necessary dependencies for the Subscription Microservice. This guide assumes you have already cloned the repository to your local machine.
+
+1. **Open a Terminal**: Navigate to the cloned repository's directory on your machine.
+
+2. **Install Go Dependencies**: Run the following command to ensure all Go dependencies are correctly installed:
+
+    ```bash
+    go mod tidy
+    ```
+
+    This command will download and install the necessary Go modules and dependencies defined in `go.mod` and `go.sum` files.
+
+3. **Install Ngrok**: To test webhooks locally, you will need Ngrok. If you haven't installed Ngrok yet, download it from [Ngrok's official website](https://ngrok.com/download) and follow the installation instructions.
+
+4. **Database Setup (Optional)**: If your microservice requires a database, ensure you have the database running either locally or in a container. Follow the database's official guide to install and set it up as needed.
+
+5. **Environment Variables**: Before running the service, you will need to set up the required environment variables. Create a `.env` file in the root directory of your project and populate it with the necessary variables. Refer to the **Configuration** section for details on the required environment variables.
+
+6. **Additional Tools**: Depending on your microservice's needs, you might need to install additional tools or services. Ensure these are installed and properly configured before proceeding.
+
+By following these steps, you will have installed all the necessary dependencies and are ready to configure and run the Subscription Microservice.
+
 
 ### Running the Service
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/yourprojectname.git
-   ```
+Instructions on how to start the service, including any build steps or commands to run.
 
-### Managing Docker Containers with Makefile Commands
+### Running the Service
 
-The project includes a Makefile for easy Docker container management. Here are the commands you can use:
+To start the Subscription Microservice, follow these steps:
 
-- **Start Containers**: To start all containers in the background without forcing a build, run:
-  ```bash
-  make up
-  ```
-  This command starts the Docker images.
+1. **Navigate to the Project Directory**: Open a terminal and change to the project directory:
 
-- **Build and Start Containers**: To stop any running containers, build all projects (when required), and start the containers, use:
-  ```bash
-  make up_build
-  ```
-  This command stops any running Docker images, builds (when necessary), and starts the Docker images.
+    ```bash
+    cd ./project
+    ```
 
-- **Stop Containers**: To stop all running containers, execute:
-  ```bash
-  make down
-  ```
-  This command stops the Docker compose and cleans up.
+2. **Build and Start the Service**: Use the provided Makefile to build and start the service:
 
-These commands provide a convenient way to manage your Docker containers directly from the command line.
+    ```bash
+    make build_up
+    ```
+
+    This command compiles the service and starts it, along with any necessary dependencies defined in the Makefile.
+
+3. **Expose the Service with Ngrok**: To make your local service accessible externally (useful for testing webhooks or sharing with others), use Ngrok to expose it:
+
+    ```bash
+    ngrok http localhost:8085
+    ```
+
+    Replace `8085` with the actual port your service is running on if different. Ngrok will provide you with a public URL that forwards to your local service.
+
+s
