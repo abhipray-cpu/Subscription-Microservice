@@ -1,6 +1,6 @@
 module payment-service
 
-go 1.22.4
+go 1.22.5
 
 require (
 	github.com/NdoleStudio/lemonsqueezy-go v1.2.3

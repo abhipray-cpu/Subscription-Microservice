@@ -53,7 +53,6 @@ func NewModels(conn *pgx.Conn) Models {
 // If the table does not exist, it creates the table
 func ensureTableExists(conn *pgx.Conn) {
 	query := `
-	DROP TABLE IF EXISTS users;
 	CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         user_name VARCHAR(255) NOT NULL,
