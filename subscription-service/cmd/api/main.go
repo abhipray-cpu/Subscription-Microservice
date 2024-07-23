@@ -29,13 +29,14 @@ import (
 // Config holds the application-wide configurations.
 // yo
 type Config struct {
-	Models   data.Models        // Data models for the application.
-	Auth     auth.Authenticator // Authentication mechanism.
-	Producer *Publisher         // Kafka producer for logging.
-	SES      *ses.SES           // SNS client for sending notifications.
-	TWILIO   *twilio.RestClient // Twilio client for sending SMS.
-	Temporal client.Client      // Temporal client for starting workers.
-	Redis    *redis.Client      // Redis client for caching.
+	Models     data.Models        // Data models for the application.
+	Auth       auth.Authenticator // Authentication mechanism.
+	Producer   *Publisher         // Kafka producer for logging.
+	SES        *ses.SES           // SNS client for sending notifications.
+	TWILIO     *twilio.RestClient // Twilio client for sending SMS.
+	Temporal   client.Client      // Temporal client for starting workers.
+	Redis      *redis.Client      // Redis client for caching.
+	Connection *pgx.Conn          // Database connection.
 }
 
 var app *Config // Global variable to hold the application configuration.
@@ -44,10 +45,8 @@ var app *Config // Global variable to hold the application configuration.
 func init() {
 	Producer := NewPublisher()                           // Create a new Kafka producer.
 	Producer.createKafkaProducer("kafka:9092", "logger") // Configure the Kafka producer.
-	authenticator := auth.NewGitHubAuthenticator()       // Initialize the GitHub authenticator.
 	app = &Config{                                       // Populate the global configuration.
 		Producer: Producer,
-		Auth:     authenticator,
 	}
 	// Attempt to publish a startup message to Kafka.
 	err := Producer.publishMessage("key", "subscription-service", "Hello from subscription-service")
@@ -100,9 +99,12 @@ func main() {
 		app.Producer.publishMessage("key", "Subscription Service", "Failed to connect to the database")
 	}
 
-	defer conn.Close(context.Background()) // Ensure the database connection is closed on exit.
-	e := echo.New()                        // Create a new Echo instance for the web server.
-	defer e.Close()                        // Ensure the Echo server is closed on exit.
+	defer conn.Close(context.Background())             // Ensure the database connection is closed on exit.
+	app.Connection = conn                              // Assign the database connection to the global configuration.
+	authenticator := auth.NewGitHubAuthenticator(conn) // Create a new GitHub authenticator.
+	app.Auth = authenticator                           // Assign the authenticator to the global configuration.
+	e := echo.New()                                    // Create a new Echo instance for the web server.
+	defer e.Close()                                    // Ensure the Echo server is closed on exit.
 
 	app.Models = data.NewModels(conn) // Initialize the data models.
 	app.routes(e)                     // Set up the web routes.
@@ -133,7 +135,7 @@ func main() {
 	}()
 	wg.Add(1)
 	go func() {
-		activities := activity.NewActivities(app.SES, app.TWILIO, app.Redis)
+		activities := activity.NewActivities(app.SES, app.TWILIO, app.Redis, app.Connection)
 		w := workers.New(app.Temporal, "subscription-service", workers.Options{})
 		w.RegisterWorkflow(workflow.WelcomeWorkflow)
 		w.RegisterWorkflow(workflow.OTPWorkflow)

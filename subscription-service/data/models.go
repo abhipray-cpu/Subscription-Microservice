@@ -3,6 +3,7 @@ package data
 
 import (
 	"context" // Used for managing the lifetime of database requests.
+	"fmt"
 	"log"
 	"regexp"
 	"strings"
@@ -32,9 +33,6 @@ type User struct {
 	SubscriptionType   string    `json:"subscriptionType"`   // Subscription type of the user.
 }
 
-// connection holds a global database connection, shared across instances of Models.
-var connection *pgx.Conn
-
 // Models wraps all the models in the application for easy access.
 type Models struct {
 	User User // User model instance.
@@ -42,7 +40,6 @@ type Models struct {
 
 // NewModels initializes a new instance of Models with a database connection.
 func NewModels(conn *pgx.Conn) Models {
-	connection = conn       // Set the global connection.
 	ensureTableExists(conn) // Ensure the table exists in the database.
 	return Models{
 		User: User{}, // Initialize the User model.
@@ -53,24 +50,25 @@ func NewModels(conn *pgx.Conn) Models {
 // If the table does not exist, it creates the table
 func ensureTableExists(conn *pgx.Conn) {
 	query := `
-	CREATE TABLE IF NOT EXISTS users (
+    DROP TABLE IF EXISTS users;
+    CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        user_name VARCHAR(255) NOT NULL,
+        user_name VARCHAR(255) NOT NULL CHECK (user_name ~ '^[A-Za-z]+$'),
         github_name VARCHAR(255) UNIQUE NOT NULL,
-        github_id VARCHAR(255) UNIQUE,
-        first_name VARCHAR(255),
-        last_name VARCHAR(255),
+        github_id VARCHAR(255),
+        first_name VARCHAR(255) CHECK (first_name ~ '^[A-Za-z ]+$'),
+        last_name VARCHAR(255) CHECK (last_name ~ '^[A-Za-z ]+$'),
         avatar_url TEXT,
         access_token TEXT,
-        bio TEXT,
-        email VARCHAR(255) NOT NULL UNIQUE,
+        bio VARCHAR(500),
+        email VARCHAR(255) NOT NULL UNIQUE CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
         expires_at TIMESTAMP NOT NULL,
-		password VARCHAR(255) NOT NULL,
-		contact VARCHAR(255) UNIQUE,
-		verified BOOLEAN DEFAULT FALSE,
-		subscription_status VARCHAR(255),
-		subscription_id FLOAT UNIQUE,
-		subscription_type VARCHAR(255)
+        password VARCHAR(255) NOT NULL,
+        contact VARCHAR(255) UNIQUE CHECK (contact ~ '^\+91[0-9]{10}$'),
+        verified BOOLEAN DEFAULT FALSE,
+        subscription_status VARCHAR(255),
+        subscription_id FLOAT UNIQUE,
+        subscription_type VARCHAR(255)
     );`
 
 	if _, err := conn.Exec(context.Background(), query); err != nil {
@@ -127,7 +125,7 @@ func isValidIndianPhoneNumber(phoneNumber string) bool {
 // - user: The User struct containing the user's information.
 // Returns:
 // - An error if the query execution fails.
-func (u *User) InsertUser(user User) error {
+func (u *User) InsertUser(connection *pgx.Conn, user User) error {
 	if user.Contact != "" {
 		user.Contact = "+91" + user.Contact
 	}
@@ -148,7 +146,7 @@ func (u *User) InsertUser(user User) error {
 // Returns:
 // - nil if the user is successfully found and the User struct is populated.
 // - An error if the query execution or scan fails.
-func (u *User) GetUser(id int64) error {
+func (u *User) GetUser(connection *pgx.Conn, id int64) error {
 	// SQL query to select a user by ID.
 	query := `SELECT id, user_name, github_name, github_id, first_name, last_name, avatar_url, bio, email,contact,verified FROM users WHERE id=$1`
 	// Execute the query and scan the result into the User struct.
@@ -166,15 +164,106 @@ func (u *User) GetUser(id int64) error {
 // - updatedUser: The updated User struct containing the new information.
 // Returns:
 // - An error if the query execution fails.
-func (u *User) UpdateUser(id int64, updatedUser User) error {
-	// SQL query to update a user's information by ID.
-	query := `UPDATE users SET user_name=$1, first_name=$2, last_name=$3,bio=$4, email=$5,contact=$6, verified=$7 WHERE id=$8`
-	// Execute the query without returning any result.
-	_, err := connection.Exec(context.Background(), query, updatedUser.UserName, updatedUser.FirstName, updatedUser.LastName, updatedUser.Bio, updatedUser.Email, updatedUser.Contact, updatedUser.Verified, id)
-	if err != nil {
-		return err // Return any errors encountered.
+func (u *User) UpdateUser(connection *pgx.Conn, id int64, updatedUser User) error {
+	baseQuery := "UPDATE users SET "
+	var args []interface{}
+	var updates []string
+	argCounter := 1
+
+	// For each field, check if provided and append to query and args as necessary
+	if updatedUser.UserName != "" {
+		updates = append(updates, fmt.Sprintf("user_name=$%d", argCounter))
+		args = append(args, updatedUser.UserName)
+		argCounter++
 	}
-	return nil // Return nil on success.
+	if updatedUser.GithubName != "" {
+		updates = append(updates, fmt.Sprintf("github_name=$%d", argCounter))
+		args = append(args, updatedUser.GithubName)
+		argCounter++
+	}
+	if updatedUser.GithubId != "" {
+		updates = append(updates, fmt.Sprintf("github_id=$%d", argCounter))
+		args = append(args, updatedUser.GithubId)
+		argCounter++
+	}
+	if updatedUser.FirstName != "" {
+		updates = append(updates, fmt.Sprintf("first_name=$%d", argCounter))
+		args = append(args, updatedUser.FirstName)
+		argCounter++
+	}
+	if updatedUser.LastName != "" {
+		updates = append(updates, fmt.Sprintf("last_name=$%d", argCounter))
+		args = append(args, updatedUser.LastName)
+		argCounter++
+	}
+	if updatedUser.AvatarUrl != "" {
+		updates = append(updates, fmt.Sprintf("avatar_url=$%d", argCounter))
+		args = append(args, updatedUser.AvatarUrl)
+		argCounter++
+	}
+	if updatedUser.Bio != "" {
+		updates = append(updates, fmt.Sprintf("bio=$%d", argCounter))
+		args = append(args, updatedUser.Bio)
+		argCounter++
+	}
+	if updatedUser.Email != "" {
+		updates = append(updates, fmt.Sprintf("email=$%d", argCounter))
+		args = append(args, updatedUser.Email)
+		argCounter++
+	}
+	if updatedUser.Contact != "" {
+		updates = append(updates, fmt.Sprintf("contact=$%d", argCounter))
+		args = append(args, updatedUser.Contact)
+		argCounter++
+	}
+	if !updatedUser.ExpiresAt.IsZero() {
+		updates = append(updates, fmt.Sprintf("expires_at=$%d", argCounter))
+		args = append(args, updatedUser.ExpiresAt)
+		argCounter++
+	}
+	if updatedUser.Password != "" {
+		updates = append(updates, fmt.Sprintf("password=$%d", argCounter))
+		args = append(args, updatedUser.Password)
+		argCounter++
+	}
+	if updatedUser.Verified {
+		updates = append(updates, fmt.Sprintf("verified=$%d", argCounter))
+		args = append(args, updatedUser.Verified)
+		argCounter++
+	}
+	if updatedUser.SubscriptionStatus != "" {
+		updates = append(updates, fmt.Sprintf("subscription_status=$%d", argCounter))
+		args = append(args, updatedUser.SubscriptionStatus)
+		argCounter++
+	}
+	if updatedUser.SubscriptionID != 0 {
+		updates = append(updates, fmt.Sprintf("subscription_id=$%d", argCounter))
+		args = append(args, updatedUser.SubscriptionID)
+		argCounter++
+	}
+	if updatedUser.SubscriptionType != "" {
+		updates = append(updates, fmt.Sprintf("subscription_type=$%d", argCounter))
+		args = append(args, updatedUser.SubscriptionType)
+		argCounter++
+	}
+
+	// Finalize query
+	if len(updates) == 0 {
+		return nil // No updates to make
+	}
+	query := baseQuery + strings.Join(updates, ", ") + fmt.Sprintf(" WHERE id=$%d", argCounter)
+	args = append(args, id)
+
+	// Execute the query
+	cmdTag, err := connection.Exec(context.Background(), query, args...)
+	if err != nil {
+		return err
+	}
+	// Check if no rows were affected.
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Errorf("no user found with id %d", id)
+	}
+	return nil
 }
 
 // UpdateUserSubscription updates an existing user's subscription status and name in the database.
@@ -184,13 +273,17 @@ func (u *User) UpdateUser(id int64, updatedUser User) error {
 // - name: The new subscription name.
 // Returns:
 // - An error if the query execution fails.
-func (u *User) UpdateUserSubscription(id int64, subscriptionStatus string, subscriptionId float64, subscriptionType string) error {
+func (u *User) UpdateUserSubscription(connection *pgx.Conn, id int64, subscriptionStatus string, subscriptionId float64, subscriptionType string) error {
 	// SQL query to update a user's subscription status and name by ID.
 	query := `UPDATE users SET subscription_status=$1, subscription_id=$2, subscription_type=$3 WHERE id=$4`
 	// Execute the query without returning any result.
-	_, err := connection.Exec(context.Background(), query, subscriptionStatus, subscriptionId, subscriptionType, id)
+	cmdTag, err := connection.Exec(context.Background(), query, subscriptionStatus, subscriptionId, subscriptionType, id)
 	if err != nil {
 		return err // Return any errors encountered.
+	}
+	// Check if no rows were affected.
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Errorf("no user found with id %d", id)
 	}
 	return nil // Return nil on success.
 }
@@ -201,13 +294,17 @@ func (u *User) UpdateUserSubscription(id int64, subscriptionStatus string, subsc
 // - id: The ID of the user to delete.
 // Returns:
 // - An error if the query execution fails.s
-func (u *User) DeleteUser(id int64) error {
+func (u *User) DeleteUser(connection *pgx.Conn, id int64) error {
 	// SQL query to delete a user by ID.
 	query := `DELETE FROM users WHERE id=$1`
-	// Execute the query without returning any result.
-	_, err := connection.Exec(context.Background(), query, id)
+	// Execute the query.
+	cmdTag, err := connection.Exec(context.Background(), query, id)
 	if err != nil {
 		return err // Return any errors encountered.
+	}
+	// Check if no rows were affected.
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Errorf("no user found with id %d", id)
 	}
 	return nil // Return nil on success.
 }
@@ -222,7 +319,7 @@ func (u *User) DeleteUser(id int64) error {
 // Returns:
 // - nil if the user is successfully found and the User struct is populated.
 // - An error if the query execution or scan fails.
-func (u *User) GetByGitId(githubId string) error {
+func (u *User) GetByGitId(connection *pgx.Conn, githubId string) error {
 	// SQL query to select a user by GitHub ID.
 	query := `SELECT id, user_name, github_name, github_id, first_name, last_name, avatar_url, bio, email,contact,verified FROM users WHERE github_id=$1`
 	// Execute the query and scan the result into the User struct.
@@ -241,7 +338,7 @@ func (u *User) GetByGitId(githubId string) error {
 // Returns:
 // - nil if the user is successfully found and the User struct is populated.
 // - An error if the query execution or scan fails.
-func (u *User) GetByEmail(email string) error {
+func (u *User) GetByEmail(connection *pgx.Conn, email string) error {
 	// SQL query to select a user by GitHub ID.
 	query := `SELECT id, user_name,password,email,contact FROM users WHERE email=$1`
 	// Execute the query and scan the result into the User struct.
@@ -260,7 +357,7 @@ func (u *User) GetByEmail(email string) error {
 // Returns:
 // - nil if the user is successfully found and the User struct is populated.
 // - An error if the query execution or scan fails.
-func (u *User) GetByContact(contact string) error {
+func (u *User) GetByContact(connection *pgx.Conn, contact string) error {
 	// SQL query to select a user by GitHub ID.
 	query := `SELECT id, user_name,password,email,contact FROM users WHERE contact=$1`
 	// Execute the query and scan the result into the User struct.

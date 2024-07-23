@@ -22,7 +22,7 @@ func (ac *ActivitiesImpl) GetUser(email string) (UserResponse, error) {
 
 	// Call the GetByEmail method on the user object, passing in the email address.
 	// This method is expected to populate the user object with data from the database.
-	err := user.GetByEmail(email)
+	err := user.GetByEmail(ac.connection, email)
 
 	// If there was an error retrieving the user, return an empty UserResponse and the error.
 	if err != nil {
@@ -46,7 +46,7 @@ func (ac *ActivitiesImpl) UpdateSubscription(id int64, subscriptionStatus string
 	// Call the UpdateUserSubscription method on the user object, passing in the user's ID,
 	// new subscription status, subscription ID, and subscription type.
 	// This method is expected to update the user's subscription information in the database.
-	err := user.UpdateUserSubscription(id, subscriptionStatus, subscriptionId, subscriptionType)
+	err := user.UpdateUserSubscription(ac.connection, id, subscriptionStatus, subscriptionId, subscriptionType)
 
 	// If there was an error updating the user's subscription, return the error.
 	if err != nil {

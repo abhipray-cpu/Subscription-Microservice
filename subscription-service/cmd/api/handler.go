@@ -62,7 +62,7 @@ func (app *Config) signup(c echo.Context) error {
 	}
 
 	// Insert the user into the database.
-	if err := user.InsertUser(user); err != nil {
+	if err := user.InsertUser(app.Connection, user); err != nil {
 		// If insertion fails, publish an error message and return an internal server error response.
 		app.Producer.publishMessage("error", "Subscription-Service", "Failed to insert user: "+err.Error())
 		return c.JSON(http.StatusInternalServerError, err.Error())
@@ -132,7 +132,7 @@ func (app *Config) login(c echo.Context) error {
 	// switch retreival function based on the credential type
 	if credential_type == "email" {
 		// Attempt to fetch the user by email from the database.
-		if err := user.GetByEmail(credential); err != nil {
+		if err := user.GetByEmail(app.Connection, credential); err != nil {
 			// Check if the error is because the user does not exist in the database.
 			if err == pgx.ErrNoRows {
 				// If the user does not exist, respond with HTTP 404 Not Found.
@@ -145,7 +145,7 @@ func (app *Config) login(c echo.Context) error {
 		hashedPassword = user.Password
 	} else {
 		// Attempt to fetch the user by contact from the database.
-		if err := user.GetByContact("+91" + credential); err != nil {
+		if err := user.GetByContact(app.Connection, "+91"+credential); err != nil {
 			// Check if the error is because the user does not exist in the database.
 			if err == pgx.ErrNoRows {
 				// If the user does not exist, respond with HTTP 404 Not Found.
@@ -192,7 +192,7 @@ func (app *Config) deleteAccount(c echo.Context) error {
 	var user data.User
 
 	// Attempt to delete the user from the database using the DeleteUser method.
-	if err := user.DeleteUser(userId); err != nil {
+	if err := user.DeleteUser(app.Connection, userId); err != nil {
 		// Check if the error is because the user does not exist in the database.
 		if err == pgx.ErrNoRows {
 			// If the user does not exist, respond with HTTP 404 Not Found.
@@ -217,7 +217,7 @@ func (app *Config) getAccount(c echo.Context) error {
 	var user data.User
 
 	// Attempt to fetch the user details from the database using the userID.
-	if err := user.GetUser(int64(userId)); err != nil {
+	if err := user.GetUser(app.Connection, int64(userId)); err != nil {
 		// Check if the error is because the user does not exist in the database.
 		if err == pgx.ErrNoRows {
 			// Respond with HTTP 404 Not Found if the user does not exist.
@@ -270,7 +270,7 @@ func (app *Config) updateAccount(c echo.Context) error {
 	user.Email = newDetails.Email
 	user.Contact = newDetails.Contact
 	// Attempt to update the user in the database with the new details.
-	if err := user.UpdateUser(userId, user); err != nil {
+	if err := user.UpdateUser(app.Connection, userId, user); err != nil {
 		// Check if the error is because the user does not exist in the database.
 		if errors.Is(err, sql.ErrNoRows) {
 			// Respond with HTTP 404 Not Found if the user is not found in the database.
@@ -290,7 +290,7 @@ func (app *Config) updateAccount(c echo.Context) error {
 func (app *Config) GenerateOTP(c echo.Context) error {
 	userId := c.Get("userID").(int64)
 	var user data.User
-	if err := user.GetUser(userId); err != nil {
+	if err := user.GetUser(app.Connection, userId); err != nil {
 		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, "user does not exist")
 		}
@@ -337,7 +337,7 @@ func (app *Config) VerifyOTP(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 	user_id := c.Get("userID").(int64)
-	if err := user.GetUser(user_id); err != nil {
+	if err := user.GetUser(app.Connection, user_id); err != nil {
 		if err == pgx.ErrNoRows {
 			return c.JSON(http.StatusNotFound, "user does not exist")
 		}
@@ -361,7 +361,7 @@ func (app *Config) VerifyOTP(c echo.Context) error {
 		if otp == body.OTP {
 			app.Redis.Del(ctx, key)
 			user.Verified = true
-			if err := user.UpdateUser(user_id, user); err != nil {
+			if err := user.UpdateUser(app.Connection, user_id, user); err != nil {
 				app.Producer.publishMessage("error", "Subscription-Service", "Failed to update user: "+err.Error())
 				return c.JSON(http.StatusInternalServerError, "Failed to verify OTP")
 
