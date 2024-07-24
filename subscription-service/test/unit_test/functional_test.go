@@ -675,16 +675,16 @@ func (suite *UserTestSuite) TestGetUserByContact(t *testing.T) {
 	}
 }
 
-func TestSuite(t *testing.T) {
-	suite := UserTestSuite{}
-	suite.SetupSuite()
-	defer suite.TeardownSuite()
-	t.Run("TestInsertUser", suite.TestInsertUser)
-	t.Run("TestGetUser", suite.TestGetUser)
-	t.Run("UpdateSubscription", suite.UpdateSubscription)
-	t.Run("TestGetUserByEmail", suite.TestGetUserByEmail)
-	t.Run("TestGetUserByContact", suite.TestGetUserByContact)
-	t.Run("TestUpdateUser", suite.TestUpdateUser)
-	t.Run("TestDeleteUser", suite.TestDeleteUser)
+func TestUserSuite(t *testing.T) {
+	user_suite := UserTestSuite{}
+	user_suite.SetupSuite()
+	defer user_suite.TeardownSuite()
+	t.Run("TestInsertUser", user_suite.TestInsertUser)
+	t.Run("TestGetUser", user_suite.TestGetUser)
+	t.Run("UpdateSubscription", user_suite.UpdateSubscription)
+	t.Run("TestGetUserByEmail", user_suite.TestGetUserByEmail)
+	t.Run("TestGetUserByContact", user_suite.TestGetUserByContact)
+	t.Run("TestUpdateUser", user_suite.TestUpdateUser)
+	t.Run("TestDeleteUser", user_suite.TestDeleteUser)
 
 }

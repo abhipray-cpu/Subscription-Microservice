@@ -3,16 +3,15 @@ module subscription-service
 go 1.22.5
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/aws/aws-sdk-go v1.54.19
 	github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/jackc/pgx/v4 v4.18.3
+	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/markbates/goth v1.80.0
 	github.com/segmentio/kafka-go v0.4.47
-	github.com/stretchr/testify v1.9.0
 	github.com/twilio/twilio-go v1.22.3
 	go.temporal.io/sdk v1.27.0
 	golang.org/x/crypto v0.24.0
@@ -53,6 +52,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	go.temporal.io/api v1.34.0 // indirect
