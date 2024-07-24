@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/ses"
 	"github.com/go-redis/redis/v8"
+	"github.com/jackc/pgx/v4"
 	twilio "github.com/twilio/twilio-go"
 )
 
@@ -28,14 +29,16 @@ type ActivitiesImpl struct {
 	sesClient    *ses.SES
 	twilioClient *twilio.RestClient
 	redis        *redis.Client
+	connection   *pgx.Conn
 }
 
 // NewActivities creates a new ActivitiesImpl instance with the given clients and services.
 // It returns an Activites interface.
-func NewActivities(sesClient *ses.SES, twilioClient *twilio.RestClient, redis *redis.Client) Activites {
+func NewActivities(sesClient *ses.SES, twilioClient *twilio.RestClient, redis *redis.Client, connection *pgx.Conn) Activites {
 	return &ActivitiesImpl{
 		sesClient:    sesClient,
 		twilioClient: twilioClient,
 		redis:        redis,
+		connection:   connection,
 	}
 }

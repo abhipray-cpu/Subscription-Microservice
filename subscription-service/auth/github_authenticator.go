@@ -16,6 +16,8 @@ import (
 	"github.com/markbates/goth/providers/github"
 )
 
+var connection *pgx.Conn
+
 const (
 	key    = "random string"
 	MaxAge = 86400 * 30
@@ -113,7 +115,7 @@ func (g *GitHubAuthenticator) CallBack(c echo.Context) error {
 	// Initialize a variable to hold user data.
 	var User data.User
 	// Check if the user exists in the database by their GitHub ID.
-	if err := User.GetByGitId(user.UserID); err != nil {
+	if err := User.GetByGitId(connection, user.UserID); err != nil {
 		// If the user does not exist, create a new user record.
 		if err == pgx.ErrNoRows {
 			// Populate the User struct with data from the authenticated GitHub user.
@@ -126,7 +128,7 @@ func (g *GitHubAuthenticator) CallBack(c echo.Context) error {
 			User.FirstName = user.FirstName
 			User.LastName = user.LastName
 			// Attempt to insert the new user into the database.
-			if err := User.InsertUser(User); err != nil {
+			if err := User.InsertUser(connection, User); err != nil {
 				// Return an error response if user creation fails.
 				return c.JSON(http.StatusInternalServerError, "error while creating user")
 			} else {
@@ -191,6 +193,7 @@ func (g *GitHubAuthenticator) Auth(c echo.Context) error {
 
 // NewGitHubAuthenticator creates a new GitHubAuthenticator instance.
 // Returns a pointer to the instance.
-func NewGitHubAuthenticator() *GitHubAuthenticator {
+func NewGitHubAuthenticator(conn *pgx.Conn) *GitHubAuthenticator {
+	connection = conn
 	return &GitHubAuthenticator{}
 }
