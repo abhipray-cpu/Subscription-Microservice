@@ -17,6 +17,7 @@ const mongoURL = "mongodb://mongo:27017"
 
 type Config struct {
 	Models data.Models
+	client *mongo.Client
 }
 
 // main is the entry point of the application.
@@ -43,7 +44,8 @@ func main() {
 
 	e := echo.New()
 	app := Config{
-		Models: data.New(client),
+		Models: data.New(),
+		client: client,
 	}
 	app.routes(e)
 	initialWaitTime := 1 * time.Second

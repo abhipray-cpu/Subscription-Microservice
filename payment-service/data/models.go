@@ -4,6 +4,7 @@ package data
 import (
 	"context" // Used for managing the lifetime of database operations.
 	"encoding/json"
+	"errors"
 	"log"  // Used for logging errors.
 	"time" // Used for handling time-related data.
 
@@ -56,23 +57,24 @@ func NewModels(conn *pgx.Conn) Models {
 func ensureTableExists(conn *pgx.Conn) {
 	query := `
     CREATE TABLE IF NOT EXISTS payments (
-        id SERIAL PRIMARY KEY,
-        customer_id FLOAT NOT NULL,
-        subscription_id VARCHAR(255) NOT NULL,
-        order_id FLOAT UNIQUE NOT NULL,
-        status VARCHAR(50) NOT NULL,
-        variant_name VARCHAR(255),
-        variant_id FLOAT NOT NULL,
-        product_id FLOAT NOT NULL,
-        product_name VARCHAR(255),
-        card_brand VARCHAR(50),
-        card_last_four CHAR(4),
-        user_name VARCHAR(255),
-        user_email VARCHAR(255),
-        renews_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`
+    id SERIAL PRIMARY KEY,
+    customer_id FLOAT NOT NULL,
+    subscription_id VARCHAR(255) NOT NULL,
+    order_id FLOAT UNIQUE NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    variant_name VARCHAR(255),
+    variant_id FLOAT NOT NULL,
+    product_id FLOAT NOT NULL,
+    product_name VARCHAR(255),
+    card_brand VARCHAR(50),
+    card_last_four CHAR(4) NOT NULL CHECK (LENGTH(card_last_four) = 4),
+    user_name VARCHAR(255) NOT NULL CHECK (user_name <> '' AND user_name ~ '^[A-Za-z ]+$'),
+    user_email VARCHAR(255) NOT NULL CHECK (user_email <> '' AND user_email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
+    renews_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (renews_at >= created_at)
+);`
 
 	if _, err := conn.Exec(context.Background(), query); err != nil {
 		log.Fatalf("Failed to ensure payments table exists: %v", err)
@@ -80,7 +82,7 @@ func ensureTableExists(conn *pgx.Conn) {
 }
 
 // CreatePayment updated to include new fields
-func (m *Models) CreatePayment(p Payment) (int, error) {
+func (m *Models) CreatePayment(connection *pgx.Conn, p Payment) (int, error) {
 	var id int // Variable to store the ID of the created payment
 	query := `
     INSERT INTO payments (customer_id, subscription_id, order_id, status, variant_name, variant_id, product_id, product_name, card_brand, card_last_four, user_name, user_email, renews_at, created_at, updated_at)
@@ -97,7 +99,7 @@ func (m *Models) CreatePayment(p Payment) (int, error) {
 }
 
 // GetPaymentByID updated to include new fields
-func (m *Models) GetPaymentByID(id int) (*Payment, error) {
+func (m *Models) GetPaymentByID(connection *pgx.Conn, id int) (*Payment, error) {
 	query := `
     SELECT id, customer_id, subscription_id, order_id, status, variant_name, variant_id, product_id, product_name, card_brand, card_last_four, user_name, user_email, renews_at, created_at, updated_at
     FROM payments
@@ -106,6 +108,10 @@ func (m *Models) GetPaymentByID(id int) (*Payment, error) {
 	var p Payment
 	err := connection.QueryRow(context.Background(), query, id).Scan(&p.ID, &p.CustomerID, &p.SubscriptionID, &p.OrderID, &p.Status, &p.VariantName, &p.VariantID, &p.ProductID, &p.ProductName, &p.CardBrand, &p.CardLastFour, &p.UserName, &p.UserEmail, &p.RenewsAt, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Custom error message when no rows are found
+			return nil, errors.New("no payment found with the given ID")
+		}
 		log.Printf("Failed to get payment by ID: %v", err)
 		return nil, err
 	}
@@ -114,7 +120,7 @@ func (m *Models) GetPaymentByID(id int) (*Payment, error) {
 
 // GetPaymentBySubscriptionID updated to include new fields
 // GetPaymentBySubscriptionID retrieves a payment record based on the subscription ID.
-func (m *Models) GetPaymentBySubscriptionID(subscriptionID string) (*Payment, error) {
+func (m *Models) GetPaymentBySubscriptionID(connection *pgx.Conn, subscriptionID string) (*Payment, error) {
 	query := `
     SELECT id, customer_id, subscription_id, order_id, status, variant_name, variant_id, product_id, product_name, card_brand, card_last_four, user_name, user_email, renews_at, created_at, updated_at
     FROM payments
@@ -123,14 +129,18 @@ func (m *Models) GetPaymentBySubscriptionID(subscriptionID string) (*Payment, er
 	var p Payment
 	err := connection.QueryRow(context.Background(), query, subscriptionID).Scan(&p.ID, &p.CustomerID, &p.SubscriptionID, &p.OrderID, &p.Status, &p.VariantName, &p.VariantID, &p.ProductID, &p.ProductName, &p.CardBrand, &p.CardLastFour, &p.UserName, &p.UserEmail, &p.RenewsAt, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
-		log.Printf("Failed to get payment by subscription ID: %v", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Custom error message when no rows are found
+			return nil, errors.New("no payment found with the given SubscriptionID")
+		}
+		log.Printf("Failed to get payment by SubscriptionID: %v", err)
 		return nil, err
 	}
 	return &p, nil
 }
 
 // UpdatePayment updated to include new fields
-func (m *Models) UpdatePayment(p Payment) error {
+func (m *Models) UpdatePayment(connection *pgx.Conn, p Payment) error {
 	query := `
     UPDATE payments
     SET customer_id = $2, subscription_id = $3, order_id = $4, status = $5, variant_name = $6, variant_id = $7, product_id = $8, product_name = $9, card_brand = $10, card_last_four = $11, user_name = $12, user_email = $13, renews_at = $14, updated_at = $15

@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -19,22 +20,24 @@ type LogEntry struct {
 	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
 }
 
-var client *mongo.Client
-
 type Models struct {
 	LogEntry LogEntry
 }
 
-func New(clint *mongo.Client) Models {
-	client = clint
+func New() Models {
 	return Models{
 		LogEntry: LogEntry{},
 	}
 }
 
-func (l *LogEntry) Insert(entry LogEntry) error {
+func (l *LogEntry) Insert(client *mongo.Client, entry LogEntry) error {
 	collection := client.Database("logs").Collection("logs")
-
+	if l.Service == "" {
+		return errors.New("service name is required")
+	}
+	if l.Message == "" {
+		return errors.New("message is required")
+	}
 	_, err := collection.InsertOne(context.TODO(), LogEntry{
 		Service:   entry.Service,
 		Message:   entry.Message,
@@ -49,7 +52,7 @@ func (l *LogEntry) Insert(entry LogEntry) error {
 	return nil
 }
 
-func (l *LogEntry) All() ([]*LogEntry, error) {
+func (l *LogEntry) All(client *mongo.Client) ([]*LogEntry, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -82,7 +85,7 @@ func (l *LogEntry) All() ([]*LogEntry, error) {
 	return logs, nil
 }
 
-func (l *LogEntry) GetOne(id string) (*LogEntry, error) {
+func (l *LogEntry) GetOne(client *mongo.Client, id string) (*LogEntry, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -102,7 +105,7 @@ func (l *LogEntry) GetOne(id string) (*LogEntry, error) {
 	return &entry, nil
 }
 
-func (l *LogEntry) DropCollection() error {
+func (l *LogEntry) DropCollection(client *mongo.Client) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -115,7 +118,7 @@ func (l *LogEntry) DropCollection() error {
 	return nil
 }
 
-func (l *LogEntry) Update() (*mongo.UpdateResult, error) {
+func (l *LogEntry) Update(client *mongo.Client) (*mongo.UpdateResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
