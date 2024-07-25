@@ -30,7 +30,7 @@ func (app *Config) SubscriptionCreated(c echo.Context) error {
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
-	id, err := app.Models.CreatePayment(*payment)
+	id, err := app.Models.CreatePayment(app.connection, *payment)
 	if err != nil {
 		go processSubscription("failed create", payment.UserEmail, "failed", payment.ProductName, payment.VariantName)
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
@@ -54,14 +54,14 @@ func (app *Config) SubscriptionUpdated(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 		go processSubscription("failed update", payment.UserEmail, "failed", payment.ProductName, payment.VariantName)
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 		go processSubscription("failed update", payment.UserEmail, "failed", payment.ProductName, payment.VariantName)
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
@@ -85,14 +85,14 @@ func (app *Config) SubscriptionCancelled(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 		go processSubscription("failed cancel", payment.UserEmail, "failed", payment.ProductName, payment.VariantName)
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 		go processSubscription("failed cancel", payment.UserEmail, "failed", payment.ProductName, payment.VariantName)
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
@@ -116,7 +116,7 @@ func (app *Config) SubscriptionResumed(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 		go processSubscription("failed resume", payment.UserEmail, "failed", payment.ProductName, payment.VariantName)
 
@@ -124,7 +124,7 @@ func (app *Config) SubscriptionResumed(c echo.Context) error {
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 		go processSubscription("failed resume", payment.UserEmail, "failed", payment.ProductName, payment.VariantName)
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
@@ -148,13 +148,13 @@ func (app *Config) SubscriptionExpired(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
@@ -177,13 +177,13 @@ func (app *Config) SubscriptionPaused(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
@@ -208,14 +208,14 @@ func (app *Config) SubscriptionUnpaused(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
@@ -240,14 +240,14 @@ func (app *Config) SubscriptionFailedPayment(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
@@ -273,14 +273,14 @@ func (app *Config) SubscriptionSucessPayment(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
@@ -305,14 +305,14 @@ func (app *Config) SubscriptionRecovered(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
@@ -338,14 +338,14 @@ func (app *Config) SubscriptionRefunded(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
@@ -369,14 +369,14 @@ func (app *Config) SubscriptionChanged(c echo.Context) error {
 		return nil
 	}
 	subscription_id := payment.SubscriptionID
-	existingpayment, err := app.Models.GetPaymentBySubscriptionID(subscription_id)
+	existingpayment, err := app.Models.GetPaymentBySubscriptionID(app.connection, subscription_id)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())
 		return nil
 	}
 	payment.ID = existingpayment.ID
-	err = app.Models.UpdatePayment(*payment)
+	err = app.Models.UpdatePayment(app.connection, *payment)
 	if err != nil {
 
 		app.Producer.publishMessage("key", "Payment Service", "Failed to create subscription"+err.Error())

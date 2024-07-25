@@ -18,6 +18,7 @@ type Config struct {
 	Models                    data.Models // Data models for the application.
 	Producer                  *Publisher  // Kafka producer for logging.
 	SubscriptionServiceClient subscription.SubscriptionServiceClient
+	connection                *pgx.Conn
 }
 
 var app *Config
@@ -42,6 +43,7 @@ func main() {
 
 	e := echo.New()
 	defer e.Close()
+	app.connection = conn
 	app.Models = data.NewModels(conn)
 	grpcConn, err := NewGrpcClient("subscription-service:50051")
 	if err != nil {

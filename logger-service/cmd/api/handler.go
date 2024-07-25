@@ -42,7 +42,7 @@ func (app *Config) writeLogHandler(c echo.Context) error {
 		UpdatedAt: time.Now(),
 	}
 
-	if err := app.Models.LogEntry.Insert(logentry); err != nil {
+	if err := app.Models.LogEntry.Insert(app.client, logentry); err != nil {
 		log.Fatalf("Failed inserting log entry: %s", err)
 		return c.JSON(http.StatusInternalServerError, "Failed inserting log entry")
 	}
